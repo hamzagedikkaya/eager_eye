@@ -11,6 +11,7 @@ require_relative "eager_eye/analyzer"
 require_relative "eager_eye/reporters/base"
 require_relative "eager_eye/reporters/console"
 require_relative "eager_eye/reporters/json"
+require_relative "eager_eye/cli"
 
 module EagerEye
   class Error < StandardError; end

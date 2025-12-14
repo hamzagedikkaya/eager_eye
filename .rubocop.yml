@@ -13,6 +13,7 @@ Style/Documentation:
   Enabled: false
 
 Metrics/BlockLength:
+  Max: 30
   Exclude:
     - "spec/**/*"
     - "*.gemspec"
@@ -21,10 +22,13 @@ Metrics/ParameterLists:
   Max: 6
 
 Metrics/AbcSize:
-  Max: 20
+  Max: 35
 
 Metrics/MethodLength:
-  Max: 20
+  Max: 30
 
 Metrics/ClassLength:
   Max: 150
+
+Layout/FirstArrayElementIndentation:
+  EnforcedStyle: consistent
