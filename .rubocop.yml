@@ -16,3 +16,9 @@ Metrics/BlockLength:
   Exclude:
     - "spec/**/*"
     - "*.gemspec"
+
+Metrics/ParameterLists:
+  Max: 6
+
+Metrics/AbcSize:
+  Max: 20
