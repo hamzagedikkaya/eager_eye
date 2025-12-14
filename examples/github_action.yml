@@ -1,0 +1,75 @@
+# Example GitHub Action workflow for using EagerEye in your Rails project
+# Copy this file to .github/workflows/eager_eye.yml in your repository
+
+name: EagerEye N+1 Analysis
+
+on:
+  pull_request:
+    paths:
+      - "app/**/*.rb"
+      - "lib/**/*.rb"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    name: N+1 Query Detection
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install EagerEye
+        run: gem install eager_eye
+
+      - name: Run EagerEye analysis
+        run: eager_eye app/ --format json > eager_eye_report.json
+        continue-on-error: true
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eager-eye-report
+          path: eager_eye_report.json
+
+      - name: Check for N+1 issues
+        run: |
+          if [ -f eager_eye_report.json ]; then
+            issues=$(cat eager_eye_report.json | ruby -rjson -e 'puts JSON.parse(STDIN.read)["summary"]["total_issues"]')
+            if [ "$issues" -gt 0 ]; then
+              echo "::warning::EagerEye detected $issues potential N+1 query issue(s)"
+              cat eager_eye_report.json | ruby -rjson -e '
+                data = JSON.parse(STDIN.read)
+                data["issues"].each do |issue|
+                  puts "::warning file=#{issue["file_path"]},line=#{issue["line_number"]}::#{issue["message"]}"
+                end
+              '
+            else
+              echo "No N+1 query issues detected!"
+            fi
+          fi
+
+  # Alternative: Strict mode that fails the build on issues
+  analyze-strict:
+    runs-on: ubuntu-latest
+    name: N+1 Query Detection (Strict)
+    if: false  # Set to true to enable strict mode
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install EagerEye
+        run: gem install eager_eye
+
+      - name: Run EagerEye analysis (strict)
+        run: eager_eye app/ --no-color
