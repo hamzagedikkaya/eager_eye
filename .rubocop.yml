@@ -13,10 +13,11 @@ Style/Documentation:
   Enabled: false
 
 Metrics/BlockLength:
-  Max: 30
+  Max: 35
   Exclude:
     - "spec/**/*"
     - "*.gemspec"
+    - "lib/eager_eye/railtie.rb"
 
 Metrics/ParameterLists:
   Max: 6

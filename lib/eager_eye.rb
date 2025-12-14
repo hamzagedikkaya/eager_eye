@@ -30,3 +30,6 @@ module EagerEye
     end
   end
 end
+
+# Load Railtie only if Rails is defined
+require_relative "eager_eye/railtie" if defined?(Rails::Railtie)
