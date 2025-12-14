@@ -171,5 +171,99 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
         expect(issues.first.file_path).to eq("app/controllers/posts_controller.rb")
       end
     end
+
+    context "with find iteration" do
+      it "detects association call inside find block" do
+        source = <<~RUBY
+          posts.find do |post|
+            post.author.active?
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.author")
+      end
+    end
+
+    context "with reject iteration" do
+      it "detects association call inside reject block" do
+        source = <<~RUBY
+          posts.reject { |post| post.category.hidden? }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.category")
+      end
+    end
+
+    context "with collect iteration" do
+      it "detects association call inside collect block" do
+        source = <<~RUBY
+          orders.collect { |order| order.customer.email }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("order.customer")
+      end
+    end
+
+    context "with flat_map iteration" do
+      it "detects association call inside flat_map block" do
+        source = <<~RUBY
+          users.flat_map { |user| user.posts }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+    end
+
+    context "nested iterations" do
+      it "detects associations in nested loops" do
+        source = <<~RUBY
+          users.each do |user|
+            user.posts.each do |post|
+              post.comments
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(2)
+      end
+    end
+
+    context "with fixture file integration" do
+      let(:fixtures_path) { File.expand_path("../fixtures", __dir__) }
+
+      it "detects issues in loop_association_bad.rb" do
+        file_path = File.join(fixtures_path, "loop_association_bad.rb")
+        source = File.read(file_path)
+        issues = detector.detect(parse(source), file_path)
+
+        expect(issues.size).to be >= 5
+      end
+
+      it "detects fewer issues in loop_association_good.rb than bad" do
+        good_file_path = File.join(fixtures_path, "loop_association_good.rb")
+        good_source = File.read(good_file_path)
+        good_issues = detector.detect(parse(good_source), good_file_path)
+
+        bad_file_path = File.join(fixtures_path, "loop_association_bad.rb")
+        bad_source = File.read(bad_file_path)
+        bad_issues = detector.detect(parse(bad_source), bad_file_path)
+
+        # Good file should have significantly fewer issues than bad file
+        expect(good_issues.size).to be < bad_issues.size
+      end
+    end
   end
 end

@@ -184,5 +184,63 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
         expect(issues.first.line_number).to eq(3)
       end
     end
+
+    context "in conditionals" do
+      it "detects count in if condition" do
+        source = <<~RUBY
+          if post.comments.count > 10
+            puts "popular"
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+
+      it "detects count in ternary" do
+        source = <<~RUBY
+          post.comments.count > 0 ? "has comments" : "no comments"
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+    end
+
+    context "with chained methods" do
+      it "does not detect count after where clause (too complex to track)" do
+        source = <<~RUBY
+          post.comments.where(approved: true).count
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        # Current implementation doesn't track through where clauses
+        # This is acceptable as where().count is often intentional
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with fixture file integration" do
+      let(:fixtures_path) { File.expand_path("../fixtures", __dir__) }
+
+      it "detects issues in counter_cache_bad.rb" do
+        file_path = File.join(fixtures_path, "counter_cache_bad.rb")
+        source = File.read(file_path)
+        issues = detector.detect(parse(source), file_path)
+
+        expect(issues.size).to be >= 5
+      end
+
+      it "detects no issues in counter_cache_good.rb" do
+        file_path = File.join(fixtures_path, "counter_cache_good.rb")
+        source = File.read(file_path)
+        issues = detector.detect(parse(source), file_path)
+
+        expect(issues).to be_empty
+      end
+    end
   end
 end

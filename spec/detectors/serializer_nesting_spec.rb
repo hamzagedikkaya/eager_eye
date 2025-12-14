@@ -210,5 +210,58 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
         expect(issues.first.file_path).to eq("app/serializers/post_serializer.rb")
       end
     end
+
+    context "with deeply nested associations" do
+      it "detects deeply chained association calls" do
+        source = <<~RUBY
+          class OrderSerializer
+            attribute :customer_address do
+              object.customer.address.city
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("customer")
+      end
+    end
+
+    context "with hash return in block" do
+      it "detects associations inside hash values" do
+        source = <<~RUBY
+          class PostSerializer
+            attribute :meta do
+              { author: object.author.name, category: object.category.title }
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(2)
+      end
+    end
+
+    context "with fixture file integration" do
+      let(:fixtures_path) { File.expand_path("../fixtures", __dir__) }
+
+      it "detects issues in serializer_bad.rb" do
+        file_path = File.join(fixtures_path, "serializer_bad.rb")
+        source = File.read(file_path)
+        issues = detector.detect(parse(source), file_path)
+
+        expect(issues.size).to be >= 5
+      end
+
+      it "detects no issues in serializer_good.rb" do
+        file_path = File.join(fixtures_path, "serializer_good.rb")
+        source = File.read(file_path)
+        issues = detector.detect(parse(source), file_path)
+
+        expect(issues).to be_empty
+      end
+    end
   end
 end
