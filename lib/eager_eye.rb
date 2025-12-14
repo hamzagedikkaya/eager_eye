@@ -7,6 +7,7 @@ require_relative "eager_eye/detectors/base"
 require_relative "eager_eye/detectors/loop_association"
 require_relative "eager_eye/detectors/serializer_nesting"
 require_relative "eager_eye/detectors/missing_counter_cache"
+require_relative "eager_eye/analyzer"
 
 module EagerEye
   class Error < StandardError; end
