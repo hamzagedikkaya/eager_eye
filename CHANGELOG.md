@@ -1,5 +1,45 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
 
-## [0.1.0] - 2025-12-14
+## [0.1.0] - 2025-12-15
 
-- Initial release
+### Added
+
+- **Static Analysis Engine**: AST-based code analysis using the `parser` gem
+- **Three N+1 Detectors**:
+  - `LoopAssociation`: Detects association calls inside iteration blocks (each, map, select, etc.)
+  - `SerializerNesting`: Detects nested association access in serializer blocks (ActiveModel::Serializer, Blueprinter, Alba)
+  - `MissingCounterCache`: Detects `.count`, `.size`, `.length` calls on associations
+- **CLI Interface**: Full-featured command line tool with options:
+  - `--format json|console`: Output format selection
+  - `--exclude PATTERN`: Exclude files matching glob patterns
+  - `--only DETECTORS`: Run specific detectors only
+  - `--no-fail`: Exit with 0 even when issues found
+  - `--no-color`: Disable colored output
+  - `--version`, `--help`: Standard CLI options
+- **Rails Integration**:
+  - Railtie with `rake eager_eye:analyze` and `rake eager_eye:json` tasks
+  - Install generator: `rails g eager_eye:install`
+  - Support for `.eager_eye.yml` configuration file
+- **Reporters**:
+  - Console reporter with colored, human-readable output
+  - JSON reporter for CI integration
+- **Configuration System**:
+  - `excluded_paths`: Glob patterns to exclude from analysis
+  - `enabled_detectors`: Select which detectors to run
+  - `app_path`: Base path for analysis (default: "app")
+  - `fail_on_issues`: Control exit code behavior
+- **GitHub Actions**: CI workflow with Ruby 3.1, 3.2, 3.3 matrix testing
+- **Comprehensive Test Suite**: 140 examples with 95.8% code coverage
+
+### Technical Details
+
+- Minimum Ruby version: 3.1.0
+- Dependencies: `parser ~> 3.3`, `ast ~> 2.4`
+- License: MIT
