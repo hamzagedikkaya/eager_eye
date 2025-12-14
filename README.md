@@ -1,40 +1,305 @@
 # EagerEye
 
-A Ruby gem for detecting N+1 queries and eager loading issues in Rails applications.
+[![CI](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg)](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml)
+[![Gem Version](https://badge.fury.io/rb/eager_eye.svg)](https://badge.fury.io/rb/eager_eye)
+[![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg)](https://www.ruby-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Static analysis tool for detecting N+1 queries in Rails applications.**
+
+EagerEye analyzes your Ruby code without running it, using AST (Abstract Syntax Tree) parsing to find potential N+1 query issues before they hit production.
+
+## Why EagerEye?
+
+Unlike runtime tools like Bullet, EagerEye:
+
+- **Runs without executing code** - Works in CI pipelines without a test suite
+- **Catches more patterns** - Detects serializer N+1s and missing counter caches
+- **Proactive detection** - Finds issues at code review time, not after deployment
+
+| Feature | EagerEye | Bullet |
+|---------|----------|--------|
+| Detection method | Static analysis | Runtime |
+| Requires test suite | No | Yes |
+| Serializer N+1 detection | Yes | Limited |
+| Counter cache suggestions | Yes | No |
+| CI integration | Native | Requires tests |
+| False positive rate | Higher | Lower |
 
 ## Installation
 
-Add this line to your application's Gemfile:
+Add to your Gemfile:
 
 ```ruby
-gem 'eager_eye'
+gem "eager_eye", group: :development
 ```
 
-And then execute:
+Then run:
 
 ```bash
 bundle install
 ```
 
-Or install it yourself as:
+Or install standalone:
 
 ```bash
 gem install eager_eye
 ```
 
-## Usage
+## Quick Start
 
-TODO: Usage instructions will be added as features are implemented.
+### CLI Usage
+
+```bash
+# Analyze default app/ directory
+eager_eye
+
+# Analyze specific paths
+eager_eye app/controllers app/serializers
+
+# Output as JSON (for CI)
+eager_eye --format json
+
+# Don't fail on issues (exit 0)
+eager_eye --no-fail
+
+# Run specific detectors only
+eager_eye --only loop_association,serializer_nesting
+
+# Exclude paths
+eager_eye --exclude "app/legacy/**"
+```
+
+### Rails Integration
+
+```bash
+# Generate config file
+rails g eager_eye:install
+
+# Run via rake
+rake eager_eye:analyze
+
+# JSON output
+rake eager_eye:json
+```
+
+## Detected Issues
+
+### 1. Loop Association (N+1 in iterations)
+
+Detects association calls inside loops that may cause N+1 queries.
+
+```ruby
+# Bad - N+1 query on each iteration
+posts.each do |post|
+  post.author.name      # Query for each post!
+  post.comments.count   # Another query for each post!
+end
+
+# Good - Eager load associations
+posts.includes(:author, :comments).each do |post|
+  post.author.name      # No additional query
+  post.comments.count   # No additional query
+end
+```
+
+### 2. Serializer Nesting (N+1 in serializers)
+
+Detects nested association access in serializer blocks.
+
+```ruby
+# Bad - N+1 in serializer
+class PostSerializer < ActiveModel::Serializer
+  attribute :author_name do
+    object.author.name  # Query for each serialized post!
+  end
+end
+
+# Good - Eager load in controller
+class PostsController < ApplicationController
+  def index
+    @posts = Post.includes(:author)
+    render json: @posts, each_serializer: PostSerializer
+  end
+end
+```
+
+Supports multiple serializer libraries:
+- ActiveModel::Serializers
+- Blueprinter
+- Alba
+
+### 3. Missing Counter Cache
+
+Detects `.count` or `.size` calls on associations that could benefit from counter caches.
+
+```ruby
+# Bad - COUNT query every time
+post.comments.count
+post.comments.size
+
+# Good - Add counter cache
+# In Comment model:
+belongs_to :post, counter_cache: true
+
+# Then this is a simple column read:
+post.comments_count
+```
+
+## Configuration
+
+### Config File (.eager_eye.yml)
+
+```yaml
+# Paths to exclude from analysis (glob patterns)
+excluded_paths:
+  - app/serializers/legacy/**
+  - lib/tasks/**
+
+# Detectors to enable (default: all)
+enabled_detectors:
+  - loop_association
+  - serializer_nesting
+  - missing_counter_cache
+
+# Base path to analyze (default: app)
+app_path: app
+
+# Exit with error code when issues found (default: true)
+fail_on_issues: true
+```
+
+### Programmatic Configuration
+
+```ruby
+EagerEye.configure do |config|
+  config.excluded_paths = ["app/legacy/**"]
+  config.enabled_detectors = [:loop_association, :serializer_nesting]
+  config.app_path = "app"
+  config.fail_on_issues = true
+end
+```
+
+## CI Integration
+
+### GitHub Actions
+
+```yaml
+name: EagerEye
+on: [pull_request]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - run: gem install eager_eye
+      - run: eager_eye app/ --format json > report.json
+      - name: Check results
+        run: |
+          issues=$(cat report.json | ruby -rjson -e 'puts JSON.parse(STDIN.read)["summary"]["total_issues"]')
+          if [ "$issues" -gt 0 ]; then
+            echo "::warning::Found $issues potential N+1 issues"
+          fi
+```
+
+See [examples/github_action.yml](examples/github_action.yml) for a complete example with PR annotations.
+
+## CLI Reference
+
+```
+Usage: eager_eye [paths] [options]
+
+Options:
+    -f, --format FORMAT      Output format: console, json (default: console)
+    -e, --exclude PATTERN    Exclude files matching pattern (can be used multiple times)
+    -o, --only DETECTORS     Run only specified detectors (comma-separated)
+        --no-fail            Exit with 0 even when issues are found
+        --no-color           Disable colored output
+    -v, --version            Show version
+    -h, --help               Show this help message
+```
+
+## Output Formats
+
+### Console (default)
+
+```
+EagerEye Analysis Results
+=========================
+
+app/controllers/posts_controller.rb
+  Line 15: [LoopAssociation] Potential N+1 query: `post.author` called inside iteration
+           Suggestion: Consider using `includes(:author)` on the collection before iterating
+
+  Line 23: [MissingCounterCache] `.count` called on `comments` may cause N+1 queries
+           Suggestion: Consider adding `counter_cache: true` to the belongs_to association
+
+----------------------------------------
+Total: 2 issues (2 warnings, 0 errors)
+```
+
+### JSON
+
+```json
+{
+  "summary": {
+    "total_issues": 2,
+    "warnings": 2,
+    "errors": 0,
+    "files_analyzed": 15
+  },
+  "issues": [
+    {
+      "detector": "loop_association",
+      "file_path": "app/controllers/posts_controller.rb",
+      "line_number": 15,
+      "message": "Potential N+1 query: `post.author` called inside iteration",
+      "severity": "warning",
+      "suggestion": "Consider using `includes(:author)` on the collection"
+    }
+  ]
+}
+```
+
+## Limitations
+
+EagerEye uses static analysis, which means:
+
+- **No runtime context** - Cannot know if associations are already eager loaded elsewhere
+- **Heuristic-based** - Uses naming conventions to identify associations (may have false positives)
+- **Ruby code only** - Does not analyze SQL queries or ActiveRecord internals
+
+For best results, use EagerEye alongside runtime tools like Bullet for comprehensive N+1 detection.
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+```bash
+# Setup
+bin/setup
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+# Run tests
+bundle exec rspec
+
+# Run linter
+bundle exec rubocop
+
+# Interactive console
+bin/console
+```
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/hamzagedikkaya/eager_eye. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/hamzagedikkaya/eager_eye/blob/master/CODE_OF_CONDUCT.md).
+Bug reports and pull requests are welcome on GitHub at https://github.com/hamzagedikkaya/eager_eye.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -am 'Add my feature'`)
+4. Push to the branch (`git push origin feature/my-feature`)
+5. Create a Pull Request
 
 ## License
 
