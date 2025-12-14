@@ -22,3 +22,6 @@ Metrics/ParameterLists:
 
 Metrics/AbcSize:
   Max: 20
+
+Metrics/MethodLength:
+  Max: 20
