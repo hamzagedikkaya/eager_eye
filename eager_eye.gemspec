@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["hamzagedikkaya"]
   spec.email = ["gedikkayahamza@gmail.com"]
 
-  spec.summary = "A Ruby gem for detecting N+1 queries and eager loading issues in Rails applications"
-  spec.description = "EagerEye helps you identify and fix N+1 query problems by analyzing your ActiveRecord queries and suggesting eager loading optimizations."
+  spec.summary = "Static analysis tool for detecting N+1 queries in Rails applications"
+  spec.description = "EagerEye detects N+1 query problems using AST analysis without running your code."
   spec.homepage = "https://github.com/hamzagedikkaya/eager_eye"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
@@ -19,6 +19,7 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/hamzagedikkaya/eager_eye"
   spec.metadata["changelog_uri"] = "https://github.com/hamzagedikkaya/eager_eye/blob/master/CHANGELOG.md"
+  spec.metadata["rubygems_mfa_required"] = "true"
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
@@ -34,6 +35,6 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Runtime dependencies
-  spec.add_dependency "parser", "~> 3.3"
   spec.add_dependency "ast", "~> 2.4"
+  spec.add_dependency "parser", "~> 3.3"
 end
