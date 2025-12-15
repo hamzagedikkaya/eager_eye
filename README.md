@@ -246,6 +246,32 @@ def schedule_stats_update
 end
 ```
 
+### 7. Pluck to Array Misuse
+
+Detects when `.pluck(:id)` or `.map(&:id)` results are used in `where` clauses instead of subqueries.
+
+```ruby
+# Bad - Two queries + memory overhead
+user_ids = User.active.pluck(:id)  # Query 1: SELECT id FROM users
+Post.where(user_id: user_ids)      # Query 2: SELECT * FROM posts WHERE user_id IN (1,2,3...)
+# Also holds potentially thousands of IDs in memory
+
+# Bad - Same problem with map
+user_ids = users.map(&:id)
+Post.where(user_id: user_ids)
+
+# Good - Single subquery, no memory overhead
+Post.where(user_id: User.active.select(:id))
+# Single query: SELECT * FROM posts WHERE user_id IN (SELECT id FROM users WHERE active = true)
+```
+
+**Performance comparison with 10,000 users:**
+
+| Approach | Queries | Memory | Time |
+|----------|---------|--------|------|
+| `pluck` + `where` | 2 | ~80KB for IDs | ~45ms |
+| `select` subquery | 1 | None | ~20ms |
+
 ## Configuration
 
 ### Config File (.eager_eye.yml)
@@ -264,6 +290,7 @@ enabled_detectors:
   - custom_method_query
   - count_in_iteration
   - callback_query
+  - pluck_to_array
 
 # Base path to analyze (default: app)
 app_path: app

@@ -12,6 +12,7 @@ RSpec.describe EagerEye::Configuration do
       expected = %i[
         loop_association serializer_nesting missing_counter_cache
         custom_method_query count_in_iteration callback_query
+        pluck_to_array
       ]
       expect(config.enabled_detectors).to eq(expected)
     end

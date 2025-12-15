@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-15
+
+### Added
+
+- **New Detector: `PluckToArray`** - Detects pluck/map results used in where clauses
+  - Catches `.pluck(:id)` and `.ids` results used in `where` clauses
+  - Catches `.map(&:id)` and `.collect(&:id)` patterns
+  - Suggests using `.select(:id)` subquery pattern for better performance
+  - Prevents two queries and memory overhead from holding IDs in arrays
+
+### Changed
+
+- Updated default `enabled_detectors` to include `:pluck_to_array`
+- Updated README with new detector documentation and performance comparison
+
 ## [0.4.0] - 2025-12-15
 
 ### Added

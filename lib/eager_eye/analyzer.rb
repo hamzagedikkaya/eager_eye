@@ -10,7 +10,8 @@ module EagerEye
       missing_counter_cache: Detectors::MissingCounterCache,
       custom_method_query: Detectors::CustomMethodQuery,
       count_in_iteration: Detectors::CountInIteration,
-      callback_query: Detectors::CallbackQuery
+      callback_query: Detectors::CallbackQuery,
+      pluck_to_array: Detectors::PluckToArray
     }.freeze
 
     attr_reader :paths, :issues

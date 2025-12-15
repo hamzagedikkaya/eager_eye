@@ -7,6 +7,7 @@ module EagerEye
     DEFAULT_DETECTORS = %i[
       loop_association serializer_nesting missing_counter_cache
       custom_method_query count_in_iteration callback_query
+      pluck_to_array
     ].freeze
 
     def initialize
