@@ -21,6 +21,9 @@ module EagerEye
         maximum
       ].freeze
 
+      # Array-only methods that should not be flagged when collection is clearly an array
+      ARRAY_METHODS = %i[first last take].freeze
+
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
 
       def self.detector_name
@@ -33,8 +36,9 @@ module EagerEye
         @issues = []
         @file_path = file_path
 
-        find_iteration_blocks(ast) do |block_body, block_var|
-          check_block_for_query_methods(block_body, block_var)
+        find_iteration_blocks(ast) do |block_body, block_var, collection|
+          is_array_collection = collection_is_array?(collection)
+          check_block_for_query_methods(block_body, block_var, is_array_collection)
         end
 
         @issues
@@ -48,7 +52,8 @@ module EagerEye
         if iteration_block?(node)
           block_var = extract_block_variable(node)
           block_body = extract_block_body(node)
-          yield(block_body, block_var) if block_var && block_body
+          collection = extract_collection(node)
+          yield(block_body, block_var, collection) if block_var && block_body
         end
 
         node.children.each do |child|
@@ -66,24 +71,38 @@ module EagerEye
         ITERATION_METHODS.include?(method_name)
       end
 
-      def check_block_for_query_methods(node, block_var)
+      def check_block_for_query_methods(node, block_var, is_array_collection = false) # rubocop:disable Style/OptionalBooleanParameter
         return unless node.is_a?(Parser::AST::Node)
 
-        add_issue(node) if query_chain_on_association?(node, block_var)
+        add_issue(node) if query_chain_on_association?(node, block_var, is_array_collection)
 
         node.children.each do |child|
-          check_block_for_query_methods(child, block_var)
+          check_block_for_query_methods(child, block_var, is_array_collection)
         end
       end
 
-      def query_chain_on_association?(node, block_var)
+      def query_chain_on_association?(node, block_var, is_array_collection = false) # rubocop:disable Style/OptionalBooleanParameter
         return false unless node.type == :send
 
         method_name = node.children[1]
         return false unless QUERY_METHODS.include?(method_name)
 
+        # Skip array-only methods when collection is clearly an array (.map result)
+        # AND the receiver is only the block variable (not chained)
+        if is_array_collection && ARRAY_METHODS.include?(method_name) &&
+           receiver_is_only_block_var?(node.children[0], block_var)
+          return false
+        end
+
         receiver = node.children[0]
         receiver_chain_starts_with?(receiver, block_var)
+      end
+
+      def receiver_is_only_block_var?(node, block_var)
+        # Returns true only if receiver is EXACTLY the block variable, not a chain
+        node.is_a?(Parser::AST::Node) &&
+          node.type == :lvar &&
+          node.children[0] == block_var
       end
 
       def receiver_chain_starts_with?(node, block_var)
@@ -111,6 +130,31 @@ module EagerEye
 
       def extract_block_body(block_node)
         block_node.children[2]
+      end
+
+      def extract_collection(block_node)
+        # Extract the collection being iterated on
+        # For: collection.each { |item| ... }
+        # Returns: the send node representing the collection method call
+        block_node.children[0]
+      end
+
+      def collection_is_array?(collection_node)
+        return false unless collection_node.is_a?(Parser::AST::Node)
+
+        case collection_node.type
+        when :array
+          # Literal array: [1, 2, 3].each { |item| ... }
+          true
+        when :send
+          # Only consider these methods as definitely returning arrays when iterating
+          method_name = collection_node.children[1]
+          # map, select, collect, etc. on anything return arrays for iteration
+          %i[map select collect flat_map to_a uniq compact].include?(method_name)
+        else
+          # Block variable itself won't tell us if it's an array
+          false
+        end
       end
 
       def add_issue(node)

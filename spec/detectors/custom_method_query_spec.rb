@@ -237,17 +237,29 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
 
       it "does not detect Ruby array methods" do
         source = <<~RUBY
+          items.map do |item|
+            [item.first, item.last]
+          end
+        RUBY
+
+        # .map returns array, .first and .last on block variable are Array methods
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "still detects queries on associations" do
+        source = <<~RUBY
           @users.each do |user|
             user.tags.first
           end
         RUBY
 
-        # This will be detected since we can't distinguish
-        # But if it's clearly an array operation, we shouldn't flag it
-        # For now, we accept this limitation
+        # user.tags.first is still a query method on association
         issues = detector.detect(parse(source), "test.rb")
 
         expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".first")
       end
     end
 
