@@ -49,7 +49,11 @@ module EagerEye
           block_body = node.children[2]
           next unless block_body
 
-          find_association_calls(block_body, block_var, file_path, issues)
+          # Check if the collection already has includes
+          collection_node = node.children[0]
+          included_associations = extract_included_associations(collection_node)
+
+          find_association_calls(block_body, block_var, file_path, issues, included_associations)
         end
 
         issues
@@ -78,7 +82,44 @@ module EagerEye
         first_arg.children[0]
       end
 
-      def find_association_calls(node, block_var, file_path, issues)
+      def extract_included_associations(collection_node)
+        included = Set.new
+        return included unless collection_node&.type == :send
+
+        # Traverse through chained method calls to find includes()
+        current = collection_node
+        while current&.type == :send
+          method_name = current.children[1]
+          extract_includes_from_method(current, included) if method_name == :includes
+
+          current = current.children[0]
+        end
+
+        included
+      end
+
+      def extract_includes_from_method(method_node, included_set)
+        args = method_node.children[2..]
+        args&.each do |arg|
+          case arg&.type
+          when :sym
+            # includes(:product)
+            included_set.add(arg.children[0])
+          when :hash
+            # includes(product: :manufacturer)
+            extract_from_hash(arg, included_set)
+          end
+        end
+      end
+
+      def extract_from_hash(hash_node, included_set)
+        hash_node.children.each do |pair|
+          key = pair.children[0]
+          included_set.add(key.children[0]) if key&.type == :sym
+        end
+      end
+
+      def find_association_calls(node, block_var, file_path, issues, included_associations = Set.new)
         reported_associations = Set.new
 
         traverse_ast(node) do |child|
@@ -90,6 +131,9 @@ module EagerEye
           # Only detect direct calls on block variable (post.author, not post.author.name)
           next unless direct_call_on_block_var?(receiver, block_var)
           next unless likely_association?(method_name)
+
+          # Skip if association is already included
+          next if included_associations.include?(method_name)
 
           # Avoid duplicate reports for same association on same line
           report_key = "#{child.loc.line}:#{method_name}"

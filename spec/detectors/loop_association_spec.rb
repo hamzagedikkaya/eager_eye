@@ -138,6 +138,57 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
 
         expect(issues).to be_empty
       end
+
+      it "does not detect when association is included" do
+        source = <<~RUBY
+          posts.includes(:author).each do |post|
+            post.author
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when multiple associations are included" do
+        source = <<~RUBY
+          posts.includes(:author, :comments).each do |post|
+            post.author.name
+            post.comments.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when association is included with hash syntax" do
+        source = <<~RUBY
+          posts.includes(author: :profile).each do |post|
+            post.author
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "detects other associations even when one is included" do
+        source = <<~RUBY
+          posts.includes(:author).each do |post|
+            post.author
+            post.comments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.comments")
+      end
     end
 
     context "with nil AST" do
