@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-12-16
+
+### Added
+
+- **RSpec Integration** - RSpec matchers for testing your codebase
+  - `pass_eager_eye` matcher for testing files and directories
+  - `only` option to run specific detectors
+  - `exclude` option to exclude files by glob pattern
+  - `max_issues` option for gradual migration (allows up to N issues)
+  - `require "eager_eye/rspec"` for easy integration
+  - Helpful failure messages with issue details
+
 ## [0.7.0] - 2025-12-15
 
 ### Added

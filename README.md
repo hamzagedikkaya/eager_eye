@@ -358,6 +358,46 @@ Apply this fix? [y/n/q] y
 
 > **Warning:** Auto-fix is experimental. Always review changes and run your test suite after applying fixes.
 
+## RSpec Integration
+
+EagerEye provides RSpec matchers for testing your codebase:
+
+```ruby
+# spec/rails_helper.rb
+require "eager_eye/rspec"
+
+# spec/eager_eye_spec.rb
+RSpec.describe "EagerEye Analysis" do
+  it "controllers have no N+1 issues" do
+    expect("app/controllers").to pass_eager_eye
+  end
+
+  it "serializers are clean" do
+    expect("app/serializers").to pass_eager_eye(only: [:serializer_nesting])
+  end
+
+  # Allow some issues during migration
+  it "legacy code is acceptable" do
+    expect("app/services/legacy").to pass_eager_eye(max_issues: 10)
+  end
+
+  it "models have no callback issues except legacy" do
+    expect("app/models").to pass_eager_eye(
+      only: [:callback_query],
+      exclude: ["app/models/legacy/**"]
+    )
+  end
+end
+```
+
+### Matcher Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `only` | `Array<Symbol>` | Run only specified detectors |
+| `exclude` | `Array<String>` | Glob patterns to exclude |
+| `max_issues` | `Integer` | Maximum allowed issues (default: 0) |
+
 ## Configuration
 
 ### Config File (.eager_eye.yml)
