@@ -7,7 +7,8 @@ module EagerEye
     DETECTOR_CLASSES = {
       loop_association: Detectors::LoopAssociation,
       serializer_nesting: Detectors::SerializerNesting,
-      missing_counter_cache: Detectors::MissingCounterCache
+      missing_counter_cache: Detectors::MissingCounterCache,
+      custom_method_query: Detectors::CustomMethodQuery
     }.freeze
 
     attr_reader :paths, :issues

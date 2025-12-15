@@ -4,7 +4,7 @@ module EagerEye
   class Configuration
     attr_accessor :excluded_paths, :enabled_detectors, :app_path, :fail_on_issues
 
-    DEFAULT_DETECTORS = %i[loop_association serializer_nesting missing_counter_cache].freeze
+    DEFAULT_DETECTORS = %i[loop_association serializer_nesting missing_counter_cache custom_method_query].freeze
 
     def initialize
       @excluded_paths = []

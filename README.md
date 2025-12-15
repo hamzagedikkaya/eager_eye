@@ -14,7 +14,7 @@ EagerEye analyzes your Ruby code without running it, using AST (Abstract Syntax 
 Unlike runtime tools like Bullet, EagerEye:
 
 - **Runs without executing code** - Works in CI pipelines without a test suite
-- **Catches more patterns** - Detects serializer N+1s and missing counter caches
+- **Catches more patterns** - Detects serializer N+1s, missing counter caches, and query methods in loops
 - **Proactive detection** - Finds issues at code review time, not after deployment
 
 | Feature | EagerEye | Bullet |
@@ -23,6 +23,7 @@ Unlike runtime tools like Bullet, EagerEye:
 | Requires test suite | No | Yes |
 | Serializer N+1 detection | Yes | Limited |
 | Counter cache suggestions | Yes | No |
+| Query methods in loops | Yes | No |
 | CI integration | Native | Requires tests |
 | False positive rate | Higher | Lower |
 
@@ -146,6 +147,35 @@ belongs_to :post, counter_cache: true
 post.comments_count
 ```
 
+### 4. Custom Method Query (N+1 in query methods)
+
+Detects query methods (`.where`, `.find_by`, `.exists?`, etc.) called on associations inside loops. **These patterns are invisible to Bullet.**
+
+```ruby
+# Bad - Bullet CANNOT catch this
+class User < ApplicationRecord
+  def supports?(team_name)
+    teams.where(name: team_name).exists?
+  end
+end
+
+@users.each do |user|
+  user.supports?("Lakers")  # Query for each user!
+end
+
+# Bad - find_by inside loop
+@orders.each do |order|
+  order.line_items.find_by(featured: true)
+end
+
+# Good - Preload and filter in Ruby
+@users.includes(:teams).each do |user|
+  user.teams.any? { |t| t.name == "Lakers" }
+end
+```
+
+**Detected methods:** `where`, `find_by`, `find_by!`, `exists?`, `find`, `first`, `last`, `take`, `pluck`, `ids`, `count`, `sum`, `average`, `minimum`, `maximum`
+
 ## Configuration
 
 ### Config File (.eager_eye.yml)
@@ -161,6 +191,7 @@ enabled_detectors:
   - loop_association
   - serializer_nesting
   - missing_counter_cache
+  - custom_method_query
 
 # Base path to analyze (default: app)
 app_path: app

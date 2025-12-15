@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-12-15
+
+### Added
+
+- **New Detector: `CustomMethodQuery`** - Detects query methods called inside iteration blocks
+  - Catches `.where`, `.find_by`, `.find_by!`, `.exists?` patterns that Bullet cannot detect
+  - Detects `.find`, `.first`, `.last`, `.take` inside loops
+  - Detects aggregation methods: `.pluck`, `.ids`, `.count`, `.sum`, `.average`, `.minimum`, `.maximum`
+  - Provides suggestions for preloading data before loops
+
+### Changed
+
+- Updated default `enabled_detectors` to include `:custom_method_query`
+- Updated README with new detector documentation and comparison table
+
 ## [0.1.0] - 2025-12-15
 
 ### Added

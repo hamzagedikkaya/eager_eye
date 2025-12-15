@@ -9,7 +9,8 @@ RSpec.describe EagerEye::Configuration do
     end
 
     it "sets default enabled_detectors" do
-      expect(config.enabled_detectors).to eq(%i[loop_association serializer_nesting missing_counter_cache])
+      expected = %i[loop_association serializer_nesting missing_counter_cache custom_method_query]
+      expect(config.enabled_detectors).to eq(expected)
     end
 
     it "sets default app_path to 'app'" do
