@@ -176,6 +176,35 @@ end
 
 **Detected methods:** `where`, `find_by`, `find_by!`, `exists?`, `find`, `first`, `last`, `take`, `pluck`, `ids`, `count`, `sum`, `average`, `minimum`, `maximum`
 
+### 5. Count in Iteration
+
+Detects `.count` called on associations inside loops. Unlike `.size`, `.count` always executes a COUNT query even when the association is preloaded.
+
+```ruby
+# Bad - COUNT query for each user, even with includes!
+@users = User.includes(:posts)
+@users.each do |user|
+  user.posts.count  # Executes: SELECT COUNT(*) FROM posts WHERE user_id = ?
+end
+
+# Good - Use .size (checks if loaded first)
+@users.each do |user|
+  user.posts.size   # No query - counts the loaded array
+end
+
+# Best - Use counter_cache for frequent counts
+# In Post model: belongs_to :user, counter_cache: true
+user.posts_count  # Just reads the column
+```
+
+**Key differences:**
+
+| Method | Loaded Collection | Not Loaded |
+|--------|------------------|------------|
+| `.count` | COUNT query | COUNT query |
+| `.size` | Array#size | COUNT query |
+| `.length` | Array#length | Loads all, then counts |
+
 ## Configuration
 
 ### Config File (.eager_eye.yml)
@@ -192,6 +221,7 @@ enabled_detectors:
   - serializer_nesting
   - missing_counter_cache
   - custom_method_query
+  - count_in_iteration
 
 # Base path to analyze (default: app)
 app_path: app

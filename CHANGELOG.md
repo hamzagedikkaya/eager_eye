@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-12-15
+
+### Added
+
+- **New Detector: `CountInIteration`** - Detects `.count` usage inside iterations
+  - `.count` always executes a COUNT query, even on preloaded associations
+  - Suggests using `.size` instead (uses loaded collection when available)
+  - Suggests `counter_cache: true` for frequently accessed counts
+  - Helps prevent unnecessary COUNT queries when associations are already loaded
+
+### Changed
+
+- Updated default `enabled_detectors` to include `:count_in_iteration`
+- Updated README with new detector documentation and comparison table
+
 ## [0.2.0] - 2025-12-15
 
 ### Added
