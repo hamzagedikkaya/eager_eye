@@ -16,6 +16,19 @@ module EagerEye
       return 0 if options[:help] || options[:version]
 
       issues = analyze
+
+      if options[:suggest_fixes]
+        fixer = AutoFixer.new(issues)
+        fixer.suggest
+        return 0
+      end
+
+      if options[:fix]
+        fixer = AutoFixer.new(issues, interactive: !options[:force])
+        fixer.run
+        return 0
+      end
+
       output_report(issues)
       exit_code(issues)
     end
@@ -31,7 +44,10 @@ module EagerEye
         fail_on_issues: true,
         colorize: $stdout.tty?,
         help: false,
-        version: false
+        version: false,
+        suggest_fixes: false,
+        fix: false,
+        force: false
       }
     end
 
@@ -50,35 +66,66 @@ module EagerEye
         opts.separator ""
         opts.separator "Options:"
 
-        opts.on("-f", "--format FORMAT", %i[console json], "Output format (console, json)") do |format|
-          options[:format] = format
-        end
+        add_output_options(opts)
+        add_filter_options(opts)
+        add_behavior_options(opts)
+        add_info_options(opts)
+        add_fix_options(opts)
+      end
+    end
 
-        opts.on("-e", "--exclude PATTERN", "Exclude files matching pattern (can be used multiple times)") do |pattern|
-          options[:exclude] << pattern
-        end
+    def add_output_options(opts)
+      opts.on("-f", "--format FORMAT", %i[console json], "Output format (console, json)") do |format|
+        options[:format] = format
+      end
 
-        opts.on("-o", "--only DETECTORS", "Run only specified detectors (comma-separated)") do |detectors|
-          options[:only] = detectors.split(",").map(&:strip).map(&:to_sym)
-        end
+      opts.on("--no-color", "Disable colored output") do
+        options[:colorize] = false
+      end
+    end
 
-        opts.on("--no-fail", "Exit with 0 even if issues found") do
-          options[:fail_on_issues] = false
-        end
+    def add_filter_options(opts)
+      opts.on("-e", "--exclude PATTERN", "Exclude files matching pattern") do |pattern|
+        options[:exclude] << pattern
+      end
 
-        opts.on("--no-color", "Disable colored output") do
-          options[:colorize] = false
-        end
+      opts.on("-o", "--only DETECTORS", "Run only specified detectors (comma-separated)") do |detectors|
+        options[:only] = detectors.split(",").map(&:strip).map(&:to_sym)
+      end
+    end
 
-        opts.on("-v", "--version", "Show version") do
-          puts "EagerEye #{EagerEye::VERSION}"
-          options[:version] = true
-        end
+    def add_behavior_options(opts)
+      opts.on("--no-fail", "Exit with 0 even if issues found") do
+        options[:fail_on_issues] = false
+      end
+    end
 
-        opts.on("-h", "--help", "Show this help message") do
-          puts opts
-          options[:help] = true
-        end
+    def add_info_options(opts)
+      opts.on("-v", "--version", "Show version") do
+        puts "EagerEye #{EagerEye::VERSION}"
+        options[:version] = true
+      end
+
+      opts.on("-h", "--help", "Show this help message") do
+        puts opts
+        options[:help] = true
+      end
+    end
+
+    def add_fix_options(opts)
+      opts.separator ""
+      opts.separator "Auto-fix options (experimental):"
+
+      opts.on("--suggest-fixes", "Show auto-fix suggestions") do
+        options[:suggest_fixes] = true
+      end
+
+      opts.on("--fix", "Apply auto-fixes interactively") do
+        options[:fix] = true
+      end
+
+      opts.on("--force", "Apply fixes without confirmation (use with --fix)") do
+        options[:force] = true
       end
     end
 

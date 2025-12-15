@@ -316,6 +316,48 @@ Both CamelCase and snake_case formats are accepted:
 | Pluck to Array | `PluckToArray` | `pluck_to_array` |
 | All Detectors | `all` | `all` |
 
+## Auto-fix (Experimental)
+
+EagerEye can automatically fix some simple issues:
+
+```bash
+# Show fix suggestions
+eager_eye --suggest-fixes
+
+# Apply fixes interactively
+eager_eye --fix
+
+# Apply all fixes without confirmation
+eager_eye --fix --force
+```
+
+### Currently Supported Auto-fixes
+
+| Issue | Fix |
+|-------|-----|
+| `.count` in iteration | → `.size` |
+| `.pluck(:id)` inline | → `.select(:id)` |
+
+### Example
+
+```
+$ eager_eye --suggest-fixes
+
+app/controllers/posts_controller.rb:
+  Line 15:
+    - user.posts.count
+    + user.posts.size
+
+$ eager_eye --fix
+app/controllers/posts_controller.rb:15
+  - user.posts.count
+  + user.posts.size
+Apply this fix? [y/n/q] y
+  Applied
+```
+
+> **Warning:** Auto-fix is experimental. Always review changes and run your test suite after applying fixes.
+
 ## Configuration
 
 ### Config File (.eager_eye.yml)

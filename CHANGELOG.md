@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-12-15
+
+### Added
+
+- **Auto-fix Suggestions (Experimental)** - Automatic fix capabilities for simple issues
+  - `--suggest-fixes` flag to show auto-fix suggestions in diff format
+  - `--fix` flag to apply auto-fixes interactively
+  - `--fix --force` to apply all fixes without confirmation
+  - Fixer for `.count` → `.size` transformation in iterations
+  - Fixer for inline `.pluck(:id)` → `.select(:id)` transformation
+
+### Note
+
+Auto-fix is experimental. Not all issues are auto-fixable. Always review changes and run your test suite after applying fixes.
+
 ## [0.6.0] - 2025-12-15
 
 ### Added
