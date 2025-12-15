@@ -272,6 +272,50 @@ Post.where(user_id: User.active.select(:id))
 | `pluck` + `where` | 2 | ~80KB for IDs | ~45ms |
 | `select` subquery | 1 | None | ~20ms |
 
+## Inline Suppression
+
+Suppress false positives using inline comments (RuboCop-style):
+
+```ruby
+# Disable for single line
+user.posts.count  # eager_eye:disable CountInIteration
+
+# Disable for next line
+# eager_eye:disable-next-line LoopAssociation
+@users.each { |u| u.profile }
+
+# Disable block
+# eager_eye:disable LoopAssociation, SerializerNesting
+@users.each do |user|
+  user.posts.each { |p| p.author }
+end
+# eager_eye:enable LoopAssociation, SerializerNesting
+
+# Disable entire file (must be in first 5 lines)
+# eager_eye:disable-file CustomMethodQuery
+
+# With reason
+user.posts.count  # eager_eye:disable CountInIteration -- using counter_cache
+
+# Disable all detectors
+# eager_eye:disable all
+```
+
+### Available Detector Names
+
+Both CamelCase and snake_case formats are accepted:
+
+| Detector | CamelCase | snake_case |
+|----------|-----------|------------|
+| Loop Association | `LoopAssociation` | `loop_association` |
+| Serializer Nesting | `SerializerNesting` | `serializer_nesting` |
+| Missing Counter Cache | `MissingCounterCache` | `missing_counter_cache` |
+| Custom Method Query | `CustomMethodQuery` | `custom_method_query` |
+| Count in Iteration | `CountInIteration` | `count_in_iteration` |
+| Callback Query | `CallbackQuery` | `callback_query` |
+| Pluck to Array | `PluckToArray` | `pluck_to_array` |
+| All Detectors | `all` | `all` |
+
 ## Configuration
 
 ### Config File (.eager_eye.yml)

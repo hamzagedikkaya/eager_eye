@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-12-15
+
+### Added
+
+- **Inline Suppression Comments** - RuboCop-style comment directives for suppressing false positives
+  - `# eager_eye:disable DetectorName` - Disable for single line (inline) or start block
+  - `# eager_eye:disable-next-line DetectorName` - Disable only the next line
+  - `# eager_eye:disable-file DetectorName` - Disable for entire file (must be in first 5 lines)
+  - `# eager_eye:enable DetectorName` - End a disable block
+  - Support for multiple detectors: `# eager_eye:disable LoopAssociation, CountInIteration`
+  - Support for reason comments: `# eager_eye:disable DetectorName -- reason here`
+  - `all` keyword to disable all detectors at once
+  - Both CamelCase (`LoopAssociation`) and snake_case (`loop_association`) detector names accepted
+
+### Changed
+
+- Updated README with inline suppression documentation
+- Added `CommentParser` module for parsing suppression directives
+
 ## [0.5.0] - 2025-12-15
 
 ### Added

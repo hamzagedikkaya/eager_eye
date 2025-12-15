@@ -58,8 +58,16 @@ module EagerEye
       ast = parse_source(source)
       return unless ast
 
+      comment_parser = CommentParser.new(source)
+
       enabled_detectors.each do |detector|
         file_issues = detector.detect(ast, file_path)
+
+        # Filter suppressed issues
+        file_issues.reject! do |issue|
+          comment_parser.disabled_at?(issue.line_number, issue.detector)
+        end
+
         @issues.concat(file_issues)
       end
     rescue Errno::ENOENT, Errno::EACCES => e
