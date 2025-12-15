@@ -11,7 +11,7 @@ RSpec.describe EagerEye::Configuration do
     it "sets default enabled_detectors" do
       expected = %i[
         loop_association serializer_nesting missing_counter_cache
-        custom_method_query count_in_iteration
+        custom_method_query count_in_iteration callback_query
       ]
       expect(config.enabled_detectors).to eq(expected)
     end

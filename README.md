@@ -205,6 +205,47 @@ user.posts_count  # Just reads the column
 | `.size` | Array#size | COUNT query |
 | `.length` | Array#length | Loads all, then counts |
 
+### 6. Callback Query Detection
+
+Detects database queries and iterations inside ActiveRecord callbacks. These become performance disasters during bulk operations.
+
+```ruby
+# Bad - Queries in callbacks
+class Article < ApplicationRecord
+  after_save :recalculate_stats
+
+  def recalculate_stats
+    author.articles.published.count  # Runs on EVERY save
+    category.update_article_count!   # Another query on EVERY save
+  end
+end
+
+# Disaster scenario
+Article.import(1000.times.map { |i| { title: "Post #{i}" } })
+# = 2000+ queries from callbacks!
+
+# Bad - N+1 in callback
+class Order < ApplicationRecord
+  after_create :notify_subscribers
+
+  def notify_subscribers
+    customer.followers.each do |follower|  # N+1!
+      NotificationMailer.new_order(follower).deliver_later
+    end
+  end
+end
+
+# Good - Use conditional callbacks
+after_save :recalculate_stats, if: :should_recalculate?
+
+# Good - Move to background job
+after_commit :schedule_stats_update, on: :create
+
+def schedule_stats_update
+  RecalculateStatsJob.perform_later(id)
+end
+```
+
 ## Configuration
 
 ### Config File (.eager_eye.yml)
@@ -222,6 +263,7 @@ enabled_detectors:
   - missing_counter_cache
   - custom_method_query
   - count_in_iteration
+  - callback_query
 
 # Base path to analyze (default: app)
 app_path: app

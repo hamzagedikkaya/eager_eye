@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-15
+
+### Added
+
+- **New Detector: `CallbackQuery`** - Detects database queries and iterations inside ActiveRecord callbacks
+  - Identifies potential bulk operation performance issues
+  - Detects query methods (`.count`, `.sum`, `.update!`, etc.) in callbacks
+  - Detects iterations (`.each`, `.map`, etc.) in callbacks as errors
+  - Severity: `:error` for iterations in callbacks, `:warning` for query methods
+  - Suggests moving to background jobs or using conditional callbacks
+
+### Changed
+
+- Updated default `enabled_detectors` to include `:callback_query`
+- Updated README with new detector documentation
+
 ## [0.3.0] - 2025-12-15
 
 ### Added

@@ -9,7 +9,8 @@ module EagerEye
       serializer_nesting: Detectors::SerializerNesting,
       missing_counter_cache: Detectors::MissingCounterCache,
       custom_method_query: Detectors::CustomMethodQuery,
-      count_in_iteration: Detectors::CountInIteration
+      count_in_iteration: Detectors::CountInIteration,
+      callback_query: Detectors::CallbackQuery
     }.freeze
 
     attr_reader :paths, :issues
