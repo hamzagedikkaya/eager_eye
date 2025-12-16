@@ -3,7 +3,6 @@
 module EagerEye
   class FixerRegistry
     FIXERS = {
-      count_in_iteration: Fixers::CountToSize,
       pluck_to_array: Fixers::PluckToSelect
     }.freeze
 
