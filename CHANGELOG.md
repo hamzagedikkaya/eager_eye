@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-12-16
+
+### Stable Release
+
+EagerEye is now production-ready! This release marks the first stable version with:
+
+- 7 battle-tested detectors
+- 95%+ test coverage
+- Comprehensive documentation
+- VS Code extension
+- RSpec integration
+- Auto-fix support
+
+### Detectors
+
+- **LoopAssociation** - N+1 in iterations
+- **SerializerNesting** - N+1 in serializers
+- **MissingCounterCache** - Counter cache suggestions
+- **CustomMethodQuery** - Query methods in loops (Bullet can't catch!)
+- **CountInIteration** - .count vs .size
+- **CallbackQuery** - Queries in callbacks
+- **PluckToArray** - Pluck to subquery
+
+### Features
+
+- CLI with JSON output
+- Configuration file support (.eager_eye.yml)
+- Inline suppression comments (RuboCop-style)
+- Auto-fix suggestions (experimental)
+- RSpec matchers (`pass_eager_eye`)
+- VS Code extension
+- GitHub Actions integration
+
+### Documentation
+
+- Added SECURITY.md
+- Added CONTRIBUTING.md
+- Coverage badge added to README
+
 ## [0.9.0] - 2025-12-16
 
 ### Added
