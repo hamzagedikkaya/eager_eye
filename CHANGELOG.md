@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-12-16
+
+### Changed
+
+- Removed `CountToSize` auto-fixer (`.count` → `.size` is not always correct)
+- Auto-fix now only supports `PluckToSelect` (`.pluck(:id)` → `.select(:id)`)
+- Updated README examples to use pluck_to_select
+
 ## [1.0.0] - 2025-12-16
 
 ### Stable Release

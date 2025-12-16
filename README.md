@@ -1,7 +1,7 @@
 # EagerEye
 
 [![CI](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg)](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml)
-[![Gem Version](https://img.shields.io/badge/gem-v1.0.0-red.svg)](https://rubygems.org/gems/eager_eye)
+[![Gem Version](https://img.shields.io/badge/gem-v1.0.1-red.svg)](https://rubygems.org/gems/eager_eye)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://github.com/hamzagedikkaya/eager_eye)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg)](https://www.ruby-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -337,7 +337,6 @@ eager_eye --fix --force
 
 | Issue | Fix |
 |-------|-----|
-| `.count` in iteration | → `.size` |
 | `.pluck(:id)` inline | → `.select(:id)` |
 
 ### Example
@@ -345,15 +344,15 @@ eager_eye --fix --force
 ```
 $ eager_eye --suggest-fixes
 
-app/controllers/posts_controller.rb:
-  Line 15:
-    - user.posts.count
-    + user.posts.size
+app/services/user_service.rb:
+  Line 12:
+    - Post.where(user_id: User.active.pluck(:id))
+    + Post.where(user_id: User.active.select(:id))
 
 $ eager_eye --fix
-app/controllers/posts_controller.rb:15
-  - user.posts.count
-  + user.posts.size
+app/services/user_service.rb:12
+  - Post.where(user_id: User.active.pluck(:id))
+  + Post.where(user_id: User.active.select(:id))
 Apply this fix? [y/n/q] y
   Applied
 ```
