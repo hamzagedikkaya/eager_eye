@@ -4,6 +4,7 @@
 [![Gem Version](https://badge.fury.io/rb/eager_eye.svg)](https://badge.fury.io/rb/eager_eye)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg)](https://www.ruby-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue.svg)](https://marketplace.visualstudio.com/items?itemName=hamzagedikkaya.eager-eye)
 
 **Static analysis tool for detecting N+1 queries in Rails applications.**
 
@@ -530,6 +531,18 @@ EagerEye uses static analysis, which means:
 - **Ruby code only** - Does not analyze SQL queries or ActiveRecord internals
 
 For best results, use EagerEye alongside runtime tools like Bullet for comprehensive N+1 detection.
+
+## VS Code Extension
+
+EagerEye is also available as a VS Code extension for real-time analysis while coding.
+
+**Features:**
+- Real-time analysis on file save
+- Problem highlighting with squiggly underlines
+- Quick fix actions for common issues
+- Status bar showing issue count
+
+**Install:** Search for "EagerEye" in VS Code Extensions or visit the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=hamzagedikkaya.eager-eye).
 
 ## Development
 

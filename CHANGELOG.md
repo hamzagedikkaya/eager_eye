@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-12-16
+
+### Added
+
+- **VS Code Extension** - Released as a separate package
+  - Real-time diagnostics on file save
+  - Problem highlighting with squiggly underlines
+  - Quick fix actions for common issues
+  - Status bar showing issue count
+  - Commands: Analyze Current File, Analyze Workspace, Clear Diagnostics
+  - Configuration options for enabling/disabling features
+  - See: https://marketplace.visualstudio.com/items?itemName=hamzagedikkaya.eager-eye
+
 ## [0.8.0] - 2025-12-16
 
 ### Added
