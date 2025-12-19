@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-12-19
+
+### Fixed
+
+- Only detect queries inside iterations in callback detector
+
 ## [1.0.1] - 2025-12-16
 
 ### Changed
