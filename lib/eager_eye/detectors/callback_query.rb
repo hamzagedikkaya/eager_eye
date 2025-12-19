@@ -99,27 +99,29 @@ module EagerEye
         method_body = method_node.children[2]
         return unless method_body
 
-        find_query_calls(method_body, method_name, callback_type)
-        find_iteration_with_queries(method_body, method_name, callback_type)
+        find_iterations_with_queries(method_body, method_name, callback_type)
       end
 
-      def find_query_calls(node, method_name, callback_type)
+      def find_iterations_with_queries(node, method_name, callback_type)
+        return unless node.is_a?(Parser::AST::Node)
+
+        if iteration_block?(node)
+          add_iteration_issue(node, method_name, callback_type)
+          find_query_calls_in_block(node, method_name, callback_type)
+        end
+
+        node.children.each do |child|
+          find_iterations_with_queries(child, method_name, callback_type)
+        end
+      end
+
+      def find_query_calls_in_block(node, method_name, callback_type)
         return unless node.is_a?(Parser::AST::Node)
 
         add_query_issue(node, method_name, callback_type) if query_call?(node)
 
         node.children.each do |child|
-          find_query_calls(child, method_name, callback_type)
-        end
-      end
-
-      def find_iteration_with_queries(node, method_name, callback_type)
-        return unless node.is_a?(Parser::AST::Node)
-
-        add_iteration_issue(node, method_name, callback_type) if iteration_block?(node)
-
-        node.children.each do |child|
-          find_iteration_with_queries(child, method_name, callback_type)
+          find_query_calls_in_block(child, method_name, callback_type)
         end
       end
 

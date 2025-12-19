@@ -14,7 +14,7 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       Parser::CurrentRuby.parse(source)
     end
 
-    context "when query is inside after_save callback" do
+    context "when single query is inside after_save callback" do
       let(:code) do
         <<~RUBY
           class Article < ApplicationRecord
@@ -29,17 +29,42 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects the query" do
+      it "does not detect single query (not N+1)" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        expect(issues.size).to eq(1)
-        expect(issues.first.message).to include("after_save")
-        expect(issues.first.message).to include(".count")
+        expect(issues).to be_empty
       end
     end
 
-    context "when query is inside before_create callback" do
+    context "when query is inside iteration in after_save callback" do
+      let(:code) do
+        <<~RUBY
+          class Article < ApplicationRecord
+            after_save :update_stats
+
+            private
+
+            def update_stats
+              authors.each do |author|
+                author.articles.count
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "detects the query inside iteration" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        query_issue = issues.find { |i| i.message.include?(".count") }
+        expect(query_issue).not_to be_nil
+        expect(query_issue.message).to include("after_save")
+      end
+    end
+
+    context "when single query is inside before_create callback" do
       let(:code) do
         <<~RUBY
           class Post < ApplicationRecord
@@ -52,13 +77,11 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects the query" do
+      it "does not detect single query (not N+1)" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        expect(issues.size).to eq(1)
-        expect(issues.first.message).to include("before_create")
-        expect(issues.first.message).to include(".maximum")
+        expect(issues).to be_empty
       end
     end
 
@@ -89,7 +112,7 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       end
     end
 
-    context "when update is inside callback" do
+    context "when single update is inside callback" do
       let(:code) do
         <<~RUBY
           class Comment < ApplicationRecord
@@ -104,14 +127,39 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects the update query" do
+      it "does not detect single update (not N+1)" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "when update is inside iteration in callback" do
+      let(:code) do
+        <<~RUBY
+          class Comment < ApplicationRecord
+            after_create :update_all_counters
+
+            private
+
+            def update_all_counters
+              posts.each do |post|
+                post.update!(comments_count: post.comments.count)
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "detects the update query inside iteration" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
         expect(issues.any? { |i| i.message.include?(".update!") }).to be true
       end
 
-      it "detects the count query" do
+      it "detects the count query inside iteration" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
@@ -184,14 +232,14 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       end
     end
 
-    context "with before_validation callback" do
+    context "with single exists? in before_validation callback" do
       let(:code) do
         <<~RUBY
           class Product < ApplicationRecord
             before_validation :ensure_unique_sku
 
             def ensure_unique_sku
-              while Product.exists?(sku: sku)
+              if Product.exists?(sku: sku)
                 self.sku = generate_new_sku
               end
             end
@@ -199,16 +247,15 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects exists? in before_validation" do
+      it "does not detect single exists? (not N+1)" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        expect(issues.any? { |i| i.message.include?(".exists?") }).to be true
-        expect(issues.first.message).to include("before_validation")
+        expect(issues).to be_empty
       end
     end
 
-    context "with multiple callbacks to same method" do
+    context "with multiple callbacks to same method with single query" do
       let(:code) do
         <<~RUBY
           class Invoice < ApplicationRecord
@@ -222,16 +269,40 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects the query (method registered once)" do
+      it "does not detect single query (not N+1)" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        expect(issues.size).to eq(1)
-        expect(issues.first.message).to include(".sum")
+        expect(issues).to be_empty
       end
     end
 
-    context "with destroy callbacks" do
+    context "with multiple callbacks to same method with iteration" do
+      let(:code) do
+        <<~RUBY
+          class Invoice < ApplicationRecord
+            after_save :recalculate_totals
+            after_update :recalculate_totals
+
+            def recalculate_totals
+              line_items.each do |item|
+                item.update!(calculated_total: item.amount * item.quantity)
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "detects query inside iteration" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
+        expect(iteration_issue).not_to be_nil
+      end
+    end
+
+    context "with single update_all in destroy callback" do
       let(:code) do
         <<~RUBY
           class Category < ApplicationRecord
@@ -244,12 +315,11 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects update_all in before_destroy" do
+      it "does not detect single update_all (not N+1)" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        expect(issues.any? { |i| i.message.include?(".update_all") }).to be true
-        expect(issues.first.message).to include("before_destroy")
+        expect(issues).to be_empty
       end
     end
 
@@ -268,17 +338,20 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
             after_save :update_stats
 
             def update_stats
-              author.articles.count
+              authors.each do |author|
+                author.articles.count
+              end
             end
           end
         RUBY
       end
 
-      it "includes suggestion about background jobs" do
+      it "includes suggestion about background jobs for iteration issues" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        expect(issues.first.suggestion).to include("background job")
+        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
+        expect(iteration_issue.suggestion).to include("background job")
       end
 
       it "sets correct file_path" do
@@ -288,20 +361,42 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         expect(issues.first.file_path).to eq("app/models/article.rb")
       end
 
-      it "sets correct line_number" do
+      it "sets correct line_number for iteration" do
         source = <<~RUBY
           class Article < ApplicationRecord
             after_save :update_stats
             def update_stats
-              author.articles.count
+              authors.each do |author|
+                author.articles.count
+              end
             end
           end
         RUBY
 
         issues = detector.detect(parse(source), "test.rb")
 
-        # Line 4 is where author.articles.count is called
-        expect(issues.first.line_number).to eq(4)
+        # Line 4 is where the iteration starts
+        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
+        expect(iteration_issue.line_number).to eq(4)
+      end
+
+      it "sets correct line_number for query inside iteration" do
+        source = <<~RUBY
+          class Article < ApplicationRecord
+            after_save :update_stats
+            def update_stats
+              authors.each do |author|
+                author.articles.count
+              end
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        # Line 5 is where author.articles.count is called
+        query_issue = issues.find { |i| i.message.include?(".count") }
+        expect(query_issue.line_number).to eq(5)
       end
     end
   end
