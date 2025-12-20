@@ -1,5 +1,5 @@
 PATH
-  remote: ../../adsız klasör/eager_eye
+  remote: .
   specs:
     eager_eye (1.0.3)
       ast (~> 2.4)
