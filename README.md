@@ -1,7 +1,7 @@
 # EagerEye
 
 [![CI](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg)](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml)
-[![Gem Version](https://img.shields.io/badge/gem-v1.0.2-red.svg)](https://rubygems.org/gems/eager_eye)
+[![Gem Version](https://img.shields.io/badge/gem-v1.0.3-red.svg)](https://rubygems.org/gems/eager_eye)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://github.com/hamzagedikkaya/eager_eye)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg)](https://www.ruby-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -209,42 +209,45 @@ user.posts_count  # Just reads the column
 
 ### 6. Callback Query Detection
 
-Detects database queries and iterations inside ActiveRecord callbacks. These become performance disasters during bulk operations.
+Detects N+1 patterns inside ActiveRecord callbacks - specifically iterations that execute queries on each loop.
 
 ```ruby
-# Bad - Queries in callbacks
-class Article < ApplicationRecord
-  after_save :recalculate_stats
-
-  def recalculate_stats
-    author.articles.published.count  # Runs on EVERY save
-    category.update_article_count!   # Another query on EVERY save
-  end
-end
-
-# Disaster scenario
-Article.import(1000.times.map { |i| { title: "Post #{i}" } })
-# = 2000+ queries from callbacks!
-
-# Bad - N+1 in callback
+# Bad - N+1 in callback (DETECTED)
 class Order < ApplicationRecord
   after_create :notify_subscribers
 
   def notify_subscribers
-    customer.followers.each do |follower|  # N+1!
-      NotificationMailer.new_order(follower).deliver_later
+    customer.followers.each do |follower|  # Error: Iteration in callback
+      follower.notifications.create!(...)  # Warning: Query on iteration variable
     end
   end
 end
 
-# Good - Use conditional callbacks
-after_save :recalculate_stats, if: :should_recalculate?
+# OK - Single query in callback (NOT flagged - not N+1)
+class Article < ApplicationRecord
+  after_save :update_stats
 
-# Good - Move to background job
-after_commit :schedule_stats_update, on: :create
+  def update_stats
+    author.articles.count  # Single query, acceptable
+  end
+end
 
-def schedule_stats_update
-  RecalculateStatsJob.perform_later(id)
+# OK - Query not on iteration variable (NOT flagged)
+class Post < ApplicationRecord
+  after_save :process_items
+
+  def process_items
+    items.each do |item|
+      OtherModel.where(name: item.name).first  # OtherModel is receiver, not item
+    end
+  end
+end
+
+# Good - Move iterations to background job
+after_commit :schedule_notifications, on: :create
+
+def schedule_notifications
+  NotifySubscribersJob.perform_later(id)
 end
 ```
 

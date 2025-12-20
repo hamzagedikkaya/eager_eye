@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2025-12-20
+
+### Fixed
+
+- Only flag queries in callbacks where the iteration variable is the receiver (reduces false positives)
+- Updated README callback query documentation to accurately reflect current behavior
+
 ## [1.0.2] - 2025-12-19
 
 ### Fixed

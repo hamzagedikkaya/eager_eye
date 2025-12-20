@@ -106,8 +106,9 @@ module EagerEye
         return unless node.is_a?(Parser::AST::Node)
 
         if iteration_block?(node)
+          block_var = extract_block_variable(node)
           add_iteration_issue(node, method_name, callback_type)
-          find_query_calls_in_block(node, method_name, callback_type)
+          find_query_calls_in_block(node, method_name, callback_type, block_var) if block_var
         end
 
         node.children.each do |child|
@@ -115,13 +116,15 @@ module EagerEye
         end
       end
 
-      def find_query_calls_in_block(node, method_name, callback_type)
+      def find_query_calls_in_block(node, method_name, callback_type, block_var)
         return unless node.is_a?(Parser::AST::Node)
 
-        add_query_issue(node, method_name, callback_type) if query_call?(node)
+        if query_call?(node) && receiver_chain_starts_with?(node.children[0], block_var)
+          add_query_issue(node, method_name, callback_type)
+        end
 
         node.children.each do |child|
-          find_query_calls_in_block(child, method_name, callback_type)
+          find_query_calls_in_block(child, method_name, callback_type, block_var)
         end
       end
 
@@ -162,6 +165,29 @@ module EagerEye
           severity: :error,
           suggestion: "Avoid iterations in callbacks. Use background jobs for bulk operations"
         )
+      end
+
+      def extract_block_variable(block_node)
+        args_node = block_node.children[1]
+        return nil unless args_node&.type == :args
+
+        first_arg = args_node.children[0]
+        return nil unless first_arg&.type == :arg
+
+        first_arg.children[0]
+      end
+
+      def receiver_chain_starts_with?(node, block_var)
+        return false unless node.is_a?(Parser::AST::Node)
+
+        case node.type
+        when :lvar
+          node.children[0] == block_var
+        when :send
+          receiver_chain_starts_with?(node.children[0], block_var)
+        else
+          false
+        end
       end
     end
   end

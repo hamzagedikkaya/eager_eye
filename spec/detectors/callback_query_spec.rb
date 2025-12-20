@@ -331,6 +331,64 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       end
     end
 
+    context "when query inside iteration is NOT on the iteration variable (false positive case)" do
+      let(:code) do
+        <<~RUBY
+          class Article < ApplicationRecord
+            after_save :process_items
+
+            def process_items
+              items.each do |item|
+                SomeService.call(item.name)
+                OtherModel.where(name: item.name).first
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not flag query when iteration variable is not the receiver" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        # Should only have the iteration issue (error), not query issues
+        query_issues = issues.select { |i| i.message.include?("Query method") }
+        expect(query_issues).to be_empty
+      end
+
+      it "still flags the iteration itself" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
+        expect(iteration_issue).not_to be_nil
+      end
+    end
+
+    context "when query inside iteration IS on the iteration variable" do
+      let(:code) do
+        <<~RUBY
+          class Article < ApplicationRecord
+            after_save :process_items
+
+            def process_items
+              items.each do |item|
+                item.related_items.where(active: true).first
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "flags query when iteration variable is the receiver" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        query_issues = issues.select { |i| i.message.include?("Query method") }
+        expect(query_issues).not_to be_empty
+      end
+    end
+
     context "issue attributes" do
       let(:code) do
         <<~RUBY
