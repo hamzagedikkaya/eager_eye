@@ -1,7 +1,7 @@
 # EagerEye
 
 [![CI](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg)](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml)
-[![Gem Version](https://img.shields.io/badge/gem-v1.0.3-red.svg)](https://rubygems.org/gems/eager_eye)
+[![Gem Version](https://img.shields.io/badge/gem-v1.0.4-red.svg)](https://rubygems.org/gems/eager_eye)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://github.com/hamzagedikkaya/eager_eye)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg)](https://www.ruby-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -99,11 +99,21 @@ posts.each do |post|
   post.comments.count   # Another query for each post!
 end
 
-# Good - Eager load associations
+# Good - Eager load associations (chained)
 posts.includes(:author, :comments).each do |post|
   post.author.name      # No additional query
   post.comments.count   # No additional query
 end
+
+# Good - Eager load on separate line (also detected correctly!)
+@posts = Post.includes(:author)
+@posts.each do |post|
+  post.author.name      # No warning - EagerEye tracks the preload
+end
+
+# Also works with preload and eager_load
+posts = Post.preload(:comments)
+posts.each { |post| post.comments.size }  # No warning
 ```
 
 ### 2. Serializer Nesting (N+1 in serializers)

@@ -189,6 +189,74 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
         expect(issues.size).to eq(1)
         expect(issues.first.message).to include("post.comments")
       end
+
+      it "does not detect when includes is called on separate line with local variable" do
+        source = <<~RUBY
+          posts = Post.includes(:author)
+          posts.each do |post|
+            post.author.name
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when preload is used on separate line" do
+        source = <<~RUBY
+          posts = Post.preload(:author, :comments)
+          posts.each do |post|
+            post.author
+            post.comments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when eager_load is used on separate line" do
+        source = <<~RUBY
+          posts = Post.eager_load(:author)
+          posts.each do |post|
+            post.author.name
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when includes is on instance variable" do
+        source = <<~RUBY
+          @posts = Post.includes(:author)
+          @posts.each do |post|
+            post.author.name
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "detects missing associations even when some are preloaded via variable" do
+        source = <<~RUBY
+          posts = Post.includes(:author)
+          posts.each do |post|
+            post.author
+            post.category
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.category")
+      end
     end
 
     context "with nil AST" do

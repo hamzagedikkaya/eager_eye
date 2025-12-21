@@ -40,4 +40,26 @@ class LoopAssociationGoodController
       post.to_param
     end
   end
+
+  def with_preload
+    # Using preload on separate line
+    @orders = Order.preload(:customer)
+    @orders.each do |order|
+      order.customer.email
+    end
+  end
+
+  def with_eager_load
+    # Using eager_load on separate line
+    comments = Comment.eager_load(:user)
+    comments.each do |comment|
+      comment.user.name
+    end
+  end
+
+  def with_includes_separate_line
+    # Using includes assigned to variable, then iterated
+    posts = Post.includes(:author)
+    posts.each { |post| post.author.name }
+  end
 end

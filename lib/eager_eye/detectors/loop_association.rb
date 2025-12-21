@@ -4,6 +4,7 @@ module EagerEye
   module Detectors
     class LoopAssociation < Base
       ITERATION_METHODS = %i[each map collect select find find_all reject filter filter_map flat_map].freeze
+      PRELOAD_METHODS = %i[includes preload eager_load].freeze
 
       # Common singular association names (belongs_to pattern)
       SINGULAR_ASSOCIATIONS = %w[
@@ -23,12 +24,10 @@ module EagerEye
 
       # Methods that should NOT be treated as associations
       EXCLUDED_METHODS = %i[
-        id to_s to_h to_a to_json to_xml inspect class object_id
-        nil? blank? present? empty? any? none? size count length
-        save save! update update! destroy destroy! delete delete!
-        valid? invalid? errors new? persisted? changed? frozen?
-        name title body content text description value key type status state
-        created_at updated_at deleted_at
+        id to_s to_h to_a to_json to_xml inspect class object_id nil? blank? present? empty?
+        any? none? size count length save save! update update! destroy destroy! delete delete!
+        valid? invalid? errors new? persisted? changed? frozen? name title body content text
+        description value key type status state created_at updated_at deleted_at
       ].freeze
 
       def self.detector_name
@@ -40,6 +39,9 @@ module EagerEye
 
         issues = []
 
+        # Build a map of variable names to their preloaded associations
+        @variable_preloads = build_variable_preloads_map(ast)
+
         traverse_ast(ast) do |node|
           next unless iteration_block?(node)
 
@@ -49,9 +51,13 @@ module EagerEye
           block_body = node.children[2]
           next unless block_body
 
-          # Check if the collection already has includes
+          # Check if the collection already has includes (both chained and from variable assignment)
           collection_node = node.children[0]
           included_associations = extract_included_associations(collection_node)
+
+          # Also check if the collection comes from a variable that was assigned with preloads
+          variable_preloads = extract_variable_preloads(collection_node)
+          included_associations.merge(variable_preloads)
 
           find_association_calls(block_body, block_var, file_path, issues, included_associations)
         end
@@ -86,16 +92,62 @@ module EagerEye
         included = Set.new
         return included unless collection_node&.type == :send
 
-        # Traverse through chained method calls to find includes()
+        # Traverse through chained method calls to find includes/preload/eager_load
         current = collection_node
         while current&.type == :send
           method_name = current.children[1]
-          extract_includes_from_method(current, included) if method_name == :includes
+          extract_includes_from_method(current, included) if PRELOAD_METHODS.include?(method_name)
 
           current = current.children[0]
         end
 
         included
+      end
+
+      def build_variable_preloads_map(ast)
+        preloads_map = {}
+
+        traverse_ast(ast) do |node|
+          case node.type
+          when :lvasgn
+            record_variable_preloads(preloads_map, :lvar, node)
+          when :ivasgn
+            record_variable_preloads(preloads_map, :ivar, node)
+          end
+        end
+
+        preloads_map
+      end
+
+      def record_variable_preloads(preloads_map, var_type, node)
+        var_name = node.children[0]
+        value_node = node.children[1]
+        return unless value_node
+
+        preloaded = extract_included_associations(value_node)
+        preloads_map[[var_type, var_name]] = preloaded unless preloaded.empty?
+      end
+
+      def extract_variable_preloads(collection_node)
+        preloads = Set.new
+        return preloads unless @variable_preloads
+
+        key = variable_key_for_node(collection_node)
+        merge_preloads_for_key(preloads, key) if key
+
+        preloads
+      end
+
+      def variable_key_for_node(node)
+        case node&.type
+        when :lvar then [:lvar, node.children[0]]
+        when :ivar then [:ivar, node.children[0]]
+        when :send then variable_key_for_node(node.children[0])
+        end
+      end
+
+      def merge_preloads_for_key(preloads, key)
+        preloads.merge(@variable_preloads[key]) if @variable_preloads[key]
       end
 
       def extract_includes_from_method(method_node, included_set)

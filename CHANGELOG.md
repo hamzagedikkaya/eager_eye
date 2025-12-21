@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2025-12-21
+
+### Fixed
+
+- Fixed false positive N+1 warnings when associations are preloaded via `includes`, `preload`, or `eager_load` on a separate line
+  - Now correctly tracks variable assignments with preload methods (e.g., `posts = Post.includes(:author)`)
+  - Supports both local variables and instance variables
+  - Works with all three preload methods: `includes`, `preload`, `eager_load`
+
 ## [1.0.3] - 2025-12-20
 
 ### Fixed
