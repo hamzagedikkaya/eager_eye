@@ -257,6 +257,91 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
         expect(issues.size).to eq(1)
         expect(issues.first.message).to include("post.category")
       end
+
+      it "does not detect when iterating over single record's association (find)" do
+        source = <<~RUBY
+          @user = User.find(params[:id])
+          @user.posts.each do |post|
+            post.comments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when iterating over single record's association (find_by)" do
+        source = <<~RUBY
+          user = User.find_by(email: "test@example.com")
+          user.posts.each do |post|
+            post.author
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when iterating over single record's association (first)" do
+        source = <<~RUBY
+          @post = Post.first
+          @post.comments.each { |c| c.user }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when iterating over single record's association (last)" do
+        source = <<~RUBY
+          order = Order.last
+          order.items.each { |item| item.product }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect when chained find is used inline" do
+        source = <<~RUBY
+          User.find(1).posts.each do |post|
+            post.comments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "still detects N+1 on collection queries" do
+        source = <<~RUBY
+          @users = User.where(active: true)
+          @users.each do |user|
+            user.posts
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("user.posts")
+      end
+
+      it "still detects N+1 on .all queries" do
+        source = <<~RUBY
+          users = User.all
+          users.each { |u| u.posts }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
     end
 
     context "with nil AST" do

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2025-12-21
+
+### Fixed
+
+- Fixed false positive N+1 warnings when iterating over a single record's associations
+  - Now correctly skips warnings for patterns like `User.find(id).posts.each { |p| p.comments }`
+  - Supports `find`, `find_by`, `find_by!`, `first`, `last`, `take`, `second`, `third`, etc.
+  - Works with both inline chains and variable assignments
+
 ## [1.0.4] - 2025-12-21
 
 ### Fixed

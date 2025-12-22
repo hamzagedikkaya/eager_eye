@@ -62,4 +62,24 @@ class LoopAssociationGoodController
     posts = Post.includes(:author)
     posts.each { |post| post.author.name }
   end
+
+  def show_action
+    # Single record - no N+1 possible
+    @user = User.find(params[:id])
+    @user.posts.each do |post|
+      post.comments.each(&:author)
+    end
+  end
+
+  def with_find_by
+    # Single record via find_by
+    user = User.find_by(email: params[:email])
+    user.orders.each(&:items)
+  end
+
+  def with_first_last
+    # Single record via first/last
+    @latest_post = Post.last
+    @latest_post.comments.each { |c| c.user.name }
+  end
 end

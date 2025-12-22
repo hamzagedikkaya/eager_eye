@@ -1,7 +1,7 @@
 # EagerEye
 
 [![CI](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg)](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml)
-[![Gem Version](https://img.shields.io/badge/gem-v1.0.4-red.svg)](https://rubygems.org/gems/eager_eye)
+[![Gem Version](https://img.shields.io/badge/gem-v1.0.5-red.svg)](https://rubygems.org/gems/eager_eye)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://github.com/hamzagedikkaya/eager_eye)
 [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg)](https://www.ruby-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -114,6 +114,12 @@ end
 # Also works with preload and eager_load
 posts = Post.preload(:comments)
 posts.each { |post| post.comments.size }  # No warning
+
+# Single record context - no N+1 possible (also detected correctly!)
+@user = User.find(params[:id])
+@user.posts.each do |post|
+  post.comments  # No warning - single user, no N+1
+end
 ```
 
 ### 2. Serializer Nesting (N+1 in serializers)

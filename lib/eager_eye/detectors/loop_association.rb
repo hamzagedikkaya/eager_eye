@@ -5,22 +5,19 @@ module EagerEye
     class LoopAssociation < Base
       ITERATION_METHODS = %i[each map collect select find find_all reject filter filter_map flat_map].freeze
       PRELOAD_METHODS = %i[includes preload eager_load].freeze
+      # Methods that return a single record (not a collection)
+      SINGLE_RECORD_METHODS = %i[find find_by find_by! first first! last last! take take! second third fourth fifth
+                                 forty_two sole find_sole_by].freeze
 
-      # Common singular association names (belongs_to pattern)
-      SINGULAR_ASSOCIATIONS = %w[
-        author user owner creator admin member customer client
-        post article comment category tag parent company organization
-        project task item order product account profile setting
-        image avatar photo attachment document
-      ].freeze
-
-      # Common plural association names (has_many pattern)
-      PLURAL_ASSOCIATIONS = %w[
-        authors users owners creators admins members customers clients
-        posts articles comments categories tags children companies organizations
-        projects tasks items orders products accounts profiles settings
-        images avatars photos attachments documents
-      ].freeze
+      # Common association names (belongs_to = singular, has_many = plural)
+      ASSOCIATION_NAMES = Set.new(%w[
+        author user owner creator admin member customer client post article comment category tag
+        parent company organization project task item order product account profile setting image
+        avatar photo attachment document authors users owners creators admins members customers
+        clients posts articles comments categories tags children companies organizations projects
+        tasks items orders products accounts profiles settings images avatars photos attachments
+        documents
+      ]).freeze
 
       # Methods that should NOT be treated as associations
       EXCLUDED_METHODS = %i[
@@ -38,9 +35,7 @@ module EagerEye
         return [] unless ast
 
         issues = []
-
-        # Build a map of variable names to their preloaded associations
-        @variable_preloads = build_variable_preloads_map(ast)
+        build_variable_maps(ast)
 
         traverse_ast(ast) do |node|
           next unless iteration_block?(node)
@@ -51,15 +46,13 @@ module EagerEye
           block_body = node.children[2]
           next unless block_body
 
-          # Check if the collection already has includes (both chained and from variable assignment)
           collection_node = node.children[0]
-          included_associations = extract_included_associations(collection_node)
+          next if single_record_iteration?(collection_node)
 
-          # Also check if the collection comes from a variable that was assigned with preloads
-          variable_preloads = extract_variable_preloads(collection_node)
-          included_associations.merge(variable_preloads)
+          included = extract_included_associations(collection_node)
+          included.merge(extract_variable_preloads(collection_node))
 
-          find_association_calls(block_body, block_var, file_path, issues, included_associations)
+          find_association_calls(block_body, block_var, file_path, issues, included)
         end
 
         issues
@@ -104,38 +97,28 @@ module EagerEye
         included
       end
 
-      def build_variable_preloads_map(ast)
-        preloads_map = {}
+      def build_variable_maps(ast)
+        @variable_preloads = {}
+        @single_record_variables = Set.new
 
         traverse_ast(ast) do |node|
-          case node.type
-          when :lvasgn
-            record_variable_preloads(preloads_map, :lvar, node)
-          when :ivasgn
-            record_variable_preloads(preloads_map, :ivar, node)
-          end
+          next unless %i[lvasgn ivasgn].include?(node.type)
+
+          var_type = node.type == :lvasgn ? :lvar : :ivar
+          var_name = node.children[0]
+          value_node = node.children[1]
+          next unless value_node
+
+          key = [var_type, var_name]
+          preloaded = extract_included_associations(value_node)
+          @variable_preloads[key] = preloaded unless preloaded.empty?
+          @single_record_variables.add(key) if single_record_query?(value_node)
         end
-
-        preloads_map
       end
 
-      def record_variable_preloads(preloads_map, var_type, node)
-        var_name = node.children[0]
-        value_node = node.children[1]
-        return unless value_node
-
-        preloaded = extract_included_associations(value_node)
-        preloads_map[[var_type, var_name]] = preloaded unless preloaded.empty?
-      end
-
-      def extract_variable_preloads(collection_node)
-        preloads = Set.new
-        return preloads unless @variable_preloads
-
-        key = variable_key_for_node(collection_node)
-        merge_preloads_for_key(preloads, key) if key
-
-        preloads
+      def extract_variable_preloads(node)
+        key = variable_key_for_node(node)
+        (key && @variable_preloads&.[](key)) || Set.new
       end
 
       def variable_key_for_node(node)
@@ -146,8 +129,19 @@ module EagerEye
         end
       end
 
-      def merge_preloads_for_key(preloads, key)
-        preloads.merge(@variable_preloads[key]) if @variable_preloads[key]
+      def single_record_query?(node)
+        current = node
+        while current&.type == :send && !SINGLE_RECORD_METHODS.include?(current.children[1])
+          current = current.children[0]
+        end
+        current&.type == :send && SINGLE_RECORD_METHODS.include?(current.children[1])
+      end
+
+      def single_record_iteration?(node)
+        return false unless node&.type == :send && (receiver = node.children[0])
+
+        key = variable_key_for_node(receiver)
+        (key && @single_record_variables&.include?(key)) || single_record_query?(receiver)
       end
 
       def extract_includes_from_method(method_node, included_set)
@@ -211,9 +205,7 @@ module EagerEye
       def likely_association?(method_name)
         return false if EXCLUDED_METHODS.include?(method_name)
 
-        name = method_name.to_s
-
-        SINGULAR_ASSOCIATIONS.include?(name) || PLURAL_ASSOCIATIONS.include?(name)
+        ASSOCIATION_NAMES.include?(method_name.to_s)
       end
     end
   end
