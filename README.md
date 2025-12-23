@@ -1,19 +1,17 @@
-<table>
+<table border="0" cellspacing="0" cellpadding="0">
   <tr>
-    <td valign="top" width="140">
-      <img src="images/icon.png" alt="EagerEye Logo" width="120">
+    <td valign="middle" width="160">
+      <img src="images/icon.png" alt="EagerEye Logo" width="140">
     </td>
-    <td valign="top">
-      <h1 style="margin: 0;">EagerEye</h1>
-      <p><strong>Static analysis tool for detecting N+1 queries in Rails applications.</strong></p>
-      <p>
-        <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-        <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.6-red.svg" alt="Gem Version"></a>
-        <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
-        <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
-        <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-        <a href="https://marketplace.visualstudio.com/items?itemName=hamzagedikkaya.eager-eye"><img src="https://img.shields.io/badge/VS%20Code-Extension-blue.svg" alt="VS Code Extension"></a>
-      </p>
+    <td valign="middle">
+      <b style="font-size: 24px;">EagerEye</b><br><br>
+      <b>Static analysis tool for detecting N+1 queries in Rails applications.</b><br><br>
+      <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
+      <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.6-red.svg" alt="Gem Version"></a>
+      <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
+      <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
+      <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=hamzagedikkaya.eager-eye"><img src="https://img.shields.io/badge/VS%20Code-Extension-blue.svg" alt="VS Code Extension"></a>
     </td>
   </tr>
 </table>
