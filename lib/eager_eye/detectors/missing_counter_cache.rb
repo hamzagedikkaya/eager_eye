@@ -15,6 +15,11 @@ module EagerEye
         children replies responses answers questions
       ].freeze
 
+      # Iteration methods that indicate a loop context
+      ITERATION_METHODS = %i[each map collect select reject find_all
+                             filter filter_map flat_map each_with_index
+                             each_with_object reduce inject sum].freeze
+
       def self.detector_name
         :missing_counter_cache
       end
@@ -26,6 +31,7 @@ module EagerEye
 
         traverse_ast(ast) do |node|
           next unless count_on_association?(node)
+          next unless inside_iteration?(node)
 
           association_name = extract_association_name(node)
           next unless association_name
@@ -33,7 +39,7 @@ module EagerEye
           issues << create_issue(
             file_path: file_path,
             line_number: node.loc.line,
-            message: "`.#{node.children[1]}` called on `#{association_name}` may cause N+1 queries",
+            message: "`.#{node.children[1]}` called on `#{association_name}` inside iteration may cause N+1 queries",
             suggestion: "Consider adding `counter_cache: true` to the belongs_to association"
           )
         end
@@ -67,6 +73,46 @@ module EagerEye
         return nil unless receiver&.type == :send
 
         receiver.children[1].to_s
+      end
+
+      # Check if the node is inside an iteration block
+      def inside_iteration?(node)
+        parent = node
+        while (parent = find_parent(parent))
+          return true if iteration_block?(parent)
+        end
+        false
+      end
+
+      def find_parent(node)
+        @parent_map ||= {}
+        @parent_map[node]
+      end
+
+      # Override traverse_ast to build parent map
+      def traverse_ast(node, &block)
+        return unless node.is_a?(Parser::AST::Node)
+
+        @parent_map ||= {}
+
+        yield node
+
+        node.children.each do |child|
+          if child.is_a?(Parser::AST::Node)
+            @parent_map[child] = node
+            traverse_ast(child, &block)
+          end
+        end
+      end
+
+      def iteration_block?(node)
+        return false unless node.type == :block
+
+        send_node = node.children[0]
+        return false unless send_node&.type == :send
+
+        method_name = send_node.children[1]
+        ITERATION_METHODS.include?(method_name)
       end
     end
   end

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2025-12-22
+
+### Fixed
+
+- Fixed false positive in `MissingCounterCache` detector for single `.count`/`.size`/`.length` calls
+  - Now only detects count calls **inside iterations** where N+1 queries actually occur
+  - Single calls like `post.comments.count` are no longer flagged (not N+1)
+  - Iteration patterns like `posts.each { |p| p.comments.count }` are correctly detected
+
 ## [1.0.5] - 2025-12-21
 
 ### Fixed

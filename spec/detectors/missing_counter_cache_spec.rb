@@ -14,60 +14,7 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
       Parser::CurrentRuby.parse(source)
     end
 
-    context "with .count method" do
-      it "detects count on association" do
-        source = <<~RUBY
-          post.comments.count
-        RUBY
-
-        issues = detector.detect(parse(source), "test.rb")
-
-        expect(issues.size).to eq(1)
-        expect(issues.first.detector).to eq(:missing_counter_cache)
-        expect(issues.first.message).to include("comments")
-        expect(issues.first.message).to include(".count")
-      end
-
-      it "detects count on various associations" do
-        source = <<~RUBY
-          user.posts.count
-          article.tags.count
-          project.tasks.count
-        RUBY
-
-        issues = detector.detect(parse(source), "test.rb")
-
-        expect(issues.size).to eq(3)
-      end
-    end
-
-    context "with .size method" do
-      it "detects size on association" do
-        source = <<~RUBY
-          post.comments.size
-        RUBY
-
-        issues = detector.detect(parse(source), "test.rb")
-
-        expect(issues.size).to eq(1)
-        expect(issues.first.message).to include(".size")
-      end
-    end
-
-    context "with .length method" do
-      it "detects length on association" do
-        source = <<~RUBY
-          user.followers.length
-        RUBY
-
-        issues = detector.detect(parse(source), "test.rb")
-
-        expect(issues.size).to eq(1)
-        expect(issues.first.message).to include(".length")
-      end
-    end
-
-    context "inside iteration" do
+    context "inside iteration - should detect" do
       it "detects count inside each block" do
         source = <<~RUBY
           posts.each do |post|
@@ -78,11 +25,141 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
         issues = detector.detect(parse(source), "test.rb")
 
         expect(issues.size).to eq(1)
+        expect(issues.first.detector).to eq(:missing_counter_cache)
+        expect(issues.first.message).to include("comments")
+        expect(issues.first.message).to include(".count")
+        expect(issues.first.message).to include("inside iteration")
+      end
+
+      it "detects count inside map block" do
+        source = <<~RUBY
+          posts.map do |post|
+            post.comments.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+
+      it "detects count inside select block" do
+        source = <<~RUBY
+          posts.select do |post|
+            post.comments.count > 10
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+
+      it "detects size inside iteration" do
+        source = <<~RUBY
+          posts.each do |post|
+            post.comments.size
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".size")
+      end
+
+      it "detects length inside iteration" do
+        source = <<~RUBY
+          users.each do |user|
+            user.followers.length
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".length")
+      end
+
+      it "detects count on various associations inside iteration" do
+        source = <<~RUBY
+          items.each do |item|
+            item.posts.count
+            item.tags.count
+            item.tasks.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(3)
+      end
+
+      it "detects count inside sum block" do
+        source = <<~RUBY
+          posts.sum { |post| post.comments.count }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+
+      it "detects count inside reduce block" do
+        source = <<~RUBY
+          posts.reduce(0) { |sum, post| sum + post.comments.count }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
       end
     end
 
-    context "in model methods" do
-      it "detects count in instance method" do
+    context "outside iteration - should NOT detect" do
+      it "does not detect single count call" do
+        source = <<~RUBY
+          post.comments.count
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect multiple single count calls" do
+        source = <<~RUBY
+          user.posts.count
+          article.tags.count
+          project.tasks.count
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect size outside iteration" do
+        source = <<~RUBY
+          post.comments.size
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect length outside iteration" do
+        source = <<~RUBY
+          user.followers.length
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect count in model instance method" do
         source = <<~RUBY
           class Post
             def popular?
@@ -93,16 +170,40 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
 
         issues = detector.detect(parse(source), "test.rb")
 
-        expect(issues.size).to eq(1)
+        expect(issues).to be_empty
+      end
+
+      it "does not detect count in if condition outside iteration" do
+        source = <<~RUBY
+          if post.comments.count > 10
+            puts "popular"
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect count in ternary outside iteration" do
+        source = <<~RUBY
+          post.comments.count > 0 ? "has comments" : "no comments"
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
       end
     end
 
     context "negative cases - should NOT detect" do
       it "does not detect count on non-association methods" do
         source = <<~RUBY
-          array.count
-          hash.count
-          [1, 2, 3].count
+          items.each do |item|
+            array.count
+            hash.count
+            [1, 2, 3].count
+          end
         RUBY
 
         issues = detector.detect(parse(source), "test.rb")
@@ -112,7 +213,7 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
 
       it "does not detect count without receiver" do
         source = <<~RUBY
-          count
+          items.each { |item| count }
         RUBY
 
         issues = detector.detect(parse(source), "test.rb")
@@ -122,7 +223,9 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
 
       it "does not detect singular association count" do
         source = <<~RUBY
-          post.author.count
+          posts.each do |post|
+            post.author.count
+          end
         RUBY
 
         issues = detector.detect(parse(source), "test.rb")
@@ -130,16 +233,18 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
         expect(issues).to be_empty
       end
 
-      it "does not detect count with arguments (conditional count)" do
+      it "does not detect count after where clause" do
         source = <<~RUBY
-          comments.count { |c| c.approved? }
+          posts.each do |post|
+            post.comments.where(approved: true).count
+          end
         RUBY
 
-        # This is actually a valid use case, but our simple detector
-        # will still flag it. For now, we accept this limitation.
         issues = detector.detect(parse(source), "test.rb")
 
-        expect(issues.size).to eq(1)
+        # Current implementation doesn't track through where clauses
+        # This is acceptable as where().count is often intentional
+        expect(issues).to be_empty
       end
     end
 
@@ -154,7 +259,7 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
     context "issue attributes" do
       it "includes suggestion about counter_cache" do
         source = <<~RUBY
-          post.comments.count
+          posts.each { |post| post.comments.count }
         RUBY
 
         issues = detector.detect(parse(source), "test.rb")
@@ -164,7 +269,7 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
 
       it "sets correct file_path" do
         source = <<~RUBY
-          post.comments.count
+          posts.each { |post| post.comments.count }
         RUBY
 
         issues = detector.detect(parse(source), "app/models/post.rb")
@@ -176,50 +281,12 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
         source = <<~RUBY
           x = 1
           y = 2
-          post.comments.count
+          posts.each { |post| post.comments.count }
         RUBY
 
         issues = detector.detect(parse(source), "test.rb")
 
         expect(issues.first.line_number).to eq(3)
-      end
-    end
-
-    context "in conditionals" do
-      it "detects count in if condition" do
-        source = <<~RUBY
-          if post.comments.count > 10
-            puts "popular"
-          end
-        RUBY
-
-        issues = detector.detect(parse(source), "test.rb")
-
-        expect(issues.size).to eq(1)
-      end
-
-      it "detects count in ternary" do
-        source = <<~RUBY
-          post.comments.count > 0 ? "has comments" : "no comments"
-        RUBY
-
-        issues = detector.detect(parse(source), "test.rb")
-
-        expect(issues.size).to eq(1)
-      end
-    end
-
-    context "with chained methods" do
-      it "does not detect count after where clause (too complex to track)" do
-        source = <<~RUBY
-          post.comments.where(approved: true).count
-        RUBY
-
-        issues = detector.detect(parse(source), "test.rb")
-
-        # Current implementation doesn't track through where clauses
-        # This is acceptable as where().count is often intentional
-        expect(issues).to be_empty
       end
     end
 
@@ -231,7 +298,8 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
         source = File.read(file_path)
         issues = detector.detect(parse(source), file_path)
 
-        expect(issues.size).to be >= 5
+        # Only count calls inside iterations should be detected
+        expect(issues.size).to be >= 4
       end
 
       it "detects no issues in counter_cache_good.rb" do
