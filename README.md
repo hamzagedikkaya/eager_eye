@@ -1,16 +1,27 @@
-<a href="#eagereye">
-  <img src="images/icon.png" alt="EagerEye Logo" width="140" align="left" hspace="15">
-</a>
+<p align="center">
+  <img src="images/icon.png" alt="EagerEye Logo" width="140">
+</p>
 
-## EagerEye
+<h1 align="center">EagerEye</h1>
 
-**Static analysis tool for detecting N+1 queries in Rails applications.**
+<p align="center">
+  <strong>Static analysis tool for detecting N+1 queries in Rails applications.</strong>
+</p>
 
-[![CI](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg)](https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml) [![Gem Version](https://img.shields.io/badge/gem-v1.0.6-red.svg)](https://rubygems.org/gems/eager_eye) [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://github.com/hamzagedikkaya/eager_eye) [![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg)](https://www.ruby-lang.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue.svg)](https://marketplace.visualstudio.com/items?itemName=hamzagedikkaya.eager-eye)
+<p align="center">
+  <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.6-red.svg" alt="Gem Version"></a>
+  <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
+  <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=hamzagedikkaya.eager-eye"><img src="https://img.shields.io/badge/VS%20Code-Extension-blue.svg" alt="VS Code Extension"></a>
+</p>
 
-<br clear="all">
+<p align="center">
+  <em>Analyze your Ruby code without running it — find N+1 query issues before they hit production using AST parsing.</em>
+</p>
 
-EagerEye analyzes your Ruby code without running it, using AST (Abstract Syntax Tree) parsing to find potential N+1 query issues before they hit production.
+---
 
 ## Why EagerEye?
 
