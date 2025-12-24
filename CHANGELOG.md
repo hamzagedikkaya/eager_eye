@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2025-12-24
+
+### Fixed
+
+- Fixed `invalid byte sequence in US-ASCII` error when parsing files containing non-ASCII characters (Turkish, Chinese, etc.)
+  - Now properly encodes source code to UTF-8 with replacement for invalid/undefined characters
+  - Fixes crash when analyzing files with special characters in comments or strings
+
 ## [1.0.6] - 2025-12-22
 
 ### Fixed

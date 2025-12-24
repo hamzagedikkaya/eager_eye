@@ -10,8 +10,8 @@ module EagerEye
     BLOCK_DISABLE_PATTERN = /eager_eye:disable\s+(.+?)(?:\s+--|$)/i
 
     def initialize(source_code)
-      @source_code = source_code
-      @lines = source_code.lines
+      @source_code = source_code.encode("UTF-8", invalid: :replace, undef: :replace)
+      @lines = @source_code.lines
       @disabled_ranges = Hash.new { |h, k| h[k] = [] }
       @file_disabled = Set.new
       @current_disabled = Set.new
