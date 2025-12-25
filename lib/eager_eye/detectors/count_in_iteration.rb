@@ -128,7 +128,6 @@ module EagerEye
           file_path: @file_path,
           line_number: node.loc.line,
           message: "`.count` called on `#{receiver_chain}` inside iteration always executes a COUNT query",
-          severity: :warning,
           suggestion: "Use `.size` instead (uses loaded collection) or add `counter_cache: true`"
         )
       end

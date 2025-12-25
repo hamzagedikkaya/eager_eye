@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.7-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.8-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -457,6 +457,19 @@ enabled_detectors:
   - callback_query
   - pluck_to_array
 
+# Severity levels per detector (error, warning, info)
+severity_levels:
+  loop_association: error        # Definite N+1
+  serializer_nesting: warning
+  custom_method_query: warning
+  count_in_iteration: warning
+  callback_query: warning
+  pluck_to_array: warning        # Optimization
+  missing_counter_cache: info    # Suggestion
+
+# Minimum severity to report (default: info)
+min_severity: warning
+
 # Base path to analyze (default: app)
 app_path: app
 
@@ -470,6 +483,8 @@ fail_on_issues: true
 EagerEye.configure do |config|
   config.excluded_paths = ["app/legacy/**"]
   config.enabled_detectors = [:loop_association, :serializer_nesting]
+  config.severity_levels = { loop_association: :error, missing_counter_cache: :info }
+  config.min_severity = :warning
   config.app_path = "app"
   config.fail_on_issues = true
 end
@@ -512,6 +527,7 @@ Options:
     -f, --format FORMAT      Output format: console, json (default: console)
     -e, --exclude PATTERN    Exclude files matching pattern (can be used multiple times)
     -o, --only DETECTORS     Run only specified detectors (comma-separated)
+    -s, --min-severity LEVEL Minimum severity to report (info, warning, error)
         --no-fail            Exit with 0 even when issues are found
         --no-color           Disable colored output
     -v, --version            Show version

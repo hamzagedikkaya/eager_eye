@@ -4,7 +4,8 @@ module EagerEye
   class Issue
     attr_reader :detector, :file_path, :line_number, :message, :severity, :suggestion
 
-    VALID_SEVERITIES = %i[warning error].freeze
+    VALID_SEVERITIES = %i[info warning error].freeze
+    SEVERITY_ORDER = { info: 0, warning: 1, error: 2 }.freeze
 
     def initialize(detector:, file_path:, line_number:, message:, severity: :warning, suggestion: nil)
       @detector = detector
@@ -13,6 +14,14 @@ module EagerEye
       @message = message
       @severity = validate_severity(severity)
       @suggestion = suggestion
+    end
+
+    def severity_level
+      SEVERITY_ORDER[severity]
+    end
+
+    def meets_minimum_severity?(min_severity)
+      severity_level >= SEVERITY_ORDER.fetch(min_severity, 0)
     end
 
     def to_h

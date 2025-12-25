@@ -61,7 +61,7 @@ module EagerEye
 
       def format_issue(issue)
         detector_label = format_detector(issue.detector)
-        severity_color = issue.severity == :error ? :red : :yellow
+        severity_color = severity_to_color(issue.severity)
 
         line = "  Line #{issue.line_number}: "
         line += colorize("[#{detector_label}]", severity_color)
@@ -72,18 +72,29 @@ module EagerEye
         line
       end
 
+      def severity_to_color(severity)
+        case severity
+        when :error then :red
+        when :warning then :yellow
+        when :info then :cyan
+        else :yellow
+        end
+      end
+
       def format_detector(detector)
         detector.to_s.split("_").map(&:capitalize).join
       end
 
       def summary
         total = issues.size
-        warnings = warning_count
         errors = error_count
+        warnings = warning_count
+        infos = info_count
 
         "Total: #{total} issue#{"s" unless total == 1} " \
-          "(#{warnings} warning#{"s" unless warnings == 1}, " \
-          "#{errors} error#{"s" unless errors == 1})"
+          "(#{errors} error#{"s" unless errors == 1}, " \
+          "#{warnings} warning#{"s" unless warnings == 1}, " \
+          "#{infos} info)"
       end
 
       def colorize(text, color)

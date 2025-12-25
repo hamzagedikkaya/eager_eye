@@ -19,6 +19,10 @@ module EagerEye
         issues.group_by(&:file_path)
       end
 
+      def info_count
+        issues.count { |i| i.severity == :info }
+      end
+
       def warning_count
         issues.count { |i| i.severity == :warning }
       end

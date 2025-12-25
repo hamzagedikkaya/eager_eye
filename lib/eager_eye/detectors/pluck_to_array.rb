@@ -140,7 +140,6 @@ module EagerEye
           file_path: @file_path,
           line_number: node.loc.line,
           message: "Using plucked/mapped array in `where` causes two queries and holds IDs in memory",
-          severity: :warning,
           suggestion: "Use `.select(:id)` subquery: `Model.where(col: OtherModel.condition.select(:id))`"
         )
       end

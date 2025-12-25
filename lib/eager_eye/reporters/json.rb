@@ -24,8 +24,9 @@ module EagerEye
       def summary_hash
         {
           total: issues.size,
-          warnings: warning_count,
           errors: error_count,
+          warnings: warning_count,
+          infos: info_count,
           files_affected: issues_by_file.keys.size
         }
       end

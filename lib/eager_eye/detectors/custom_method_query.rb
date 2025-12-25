@@ -165,7 +165,6 @@ module EagerEye
           file_path: @file_path,
           line_number: node.loc.line,
           message: "Query method `.#{method_name}` called on `#{association_chain}` inside iteration",
-          severity: :warning,
           suggestion: "This query executes on each iteration. Consider preloading data or restructuring the query."
         )
       end

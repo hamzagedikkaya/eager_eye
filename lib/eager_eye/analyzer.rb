@@ -68,6 +68,10 @@ module EagerEye
           comment_parser.disabled_at?(issue.line_number, issue.detector)
         end
 
+        # Filter by minimum severity
+        min_severity = EagerEye.configuration.min_severity
+        file_issues.select! { |issue| issue.meets_minimum_severity?(min_severity) }
+
         @issues.concat(file_issues)
       end
     rescue Errno::ENOENT, Errno::EACCES => e

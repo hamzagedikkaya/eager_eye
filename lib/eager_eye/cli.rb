@@ -41,6 +41,7 @@ module EagerEye
         format: :console,
         exclude: [],
         only: [],
+        min_severity: nil,
         fail_on_issues: true,
         colorize: $stdout.tty?,
         help: false,
@@ -92,6 +93,11 @@ module EagerEye
       opts.on("-o", "--only DETECTORS", "Run only specified detectors (comma-separated)") do |detectors|
         options[:only] = detectors.split(",").map(&:strip).map(&:to_sym)
       end
+
+      opts.on("-s", "--min-severity LEVEL", %i[info warning error],
+              "Minimum severity to report (info, warning, error)") do |level|
+        options[:min_severity] = level
+      end
     end
 
     def add_behavior_options(opts)
@@ -140,6 +146,7 @@ module EagerEye
       EagerEye.configure do |config|
         config.excluded_paths += options[:exclude]
         config.enabled_detectors = options[:only] unless options[:only].empty?
+        config.min_severity = options[:min_severity] if options[:min_severity]
       end
     end
 

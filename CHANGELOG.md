@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.8] - 2025-12-25
+
+### Added
+
+- **Severity Levels** - error/warning/info with `--min-severity` filtering
+  - Defaults: `loop_association`=error, `missing_counter_cache`=info, others=warning
+  - Configurable via `.eager_eye.yml` (`severity_levels`, `min_severity`)
+
 ## [1.0.7] - 2025-12-24
 
 ### Fixed
