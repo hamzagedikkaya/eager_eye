@@ -73,12 +73,7 @@ module EagerEye
       end
 
       def severity_to_color(severity)
-        case severity
-        when :error then :red
-        when :warning then :yellow
-        when :info then :cyan
-        else :yellow
-        end
+        { error: :red, warning: :yellow, info: :cyan }.fetch(severity, :yellow)
       end
 
       def format_detector(detector)
