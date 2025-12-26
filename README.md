@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.8-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.9-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -22,6 +22,24 @@
 </p>
 
 ---
+
+## Table of Contents
+- [Why EagerEye?](#why-eagereye)
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Detected Issues](#detected-issues)
+- [Inline Suppression](#inline-suppression)
+- [Auto-fix](#auto-fix-experimental)
+- [RSpec Integration](#rspec-integration)
+- [Configuration](#configuration)
+- [CI Integration](#ci-integration)
+- [CLI Reference](#cli-reference)
+- [Output Formats](#output-formats)
+- [Limitations](#limitations)
+- [VS Code Extension](#vs-code-extension)
+- [Development](#development)
+- [Contributing](#contributing)
 
 ## Why EagerEye?
 
@@ -40,6 +58,28 @@ Unlike runtime tools like Bullet, EagerEye:
 | Query methods in loops | Yes | No |
 | CI integration | Native | Requires tests |
 | False positive rate | Higher | Lower |
+
+## Features
+
+✨ **Detects 7 types of N+1 problems:**
+- Loop associations (queries in iterations)
+- Serializer nesting issues
+- Missing counter caches
+- Custom method queries (invisible to Bullet)
+- Count in iteration patterns
+- Callback query N+1s
+- Pluck to array misuse
+
+🔧 **Developer-friendly:**
+- Inline suppression (like RuboCop)
+- Auto-fix support (experimental)
+- JSON/Console output formats
+- RSpec integration
+
+🚀 **CI-ready:**
+- No test suite required
+- GitHub Actions examples included
+- Severity levels and filtering
 
 ## Installation
 

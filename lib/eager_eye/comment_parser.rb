@@ -2,12 +2,12 @@
 
 module EagerEye
   class CommentParser
-    DISABLE_PATTERN = /eager_eye:disable(?:-next-line|-file)?\s+(.+?)(?:\s+--|$)/i
-    ENABLE_PATTERN = /eager_eye:enable\s+(.+?)(?:\s+--|$)/i
-    INLINE_DISABLE_PATTERN = /eager_eye:disable\s+(.+?)(?:\s+--|$)/i
     FILE_DISABLE_PATTERN = /eager_eye:disable-file\s+(.+?)(?:\s+--|$)/i
-    NEXT_LINE_PATTERN = /eager_eye:disable-next-line\s+(.+?)(?:\s+--|$)/i
-    BLOCK_DISABLE_PATTERN = /eager_eye:disable\s+(.+?)(?:\s+--|$)/i
+    NEXT_LINE_PATTERN = /eager_eye:disable-next-line(?:\s+(.+?))?(?:\s+--|$)/i
+    BLOCK_START_PATTERN = /eager_eye:disable-block(?:\s+(.+?))?(?:\s+--|$)/i
+    BLOCK_END_PATTERN = /eager_eye:enable-block(?:\s+(.+?))?(?:\s+--|$)/i
+    INLINE_DISABLE_PATTERN = /eager_eye:disable\s+(.+?)(?:\s+--|$)/i
+    ENABLE_PATTERN = /eager_eye:enable(?:\s+(.+?))?(?:\s+--|$)/i
 
     def initialize(source_code)
       @source_code = source_code.encode("UTF-8", invalid: :replace, undef: :replace)
@@ -46,39 +46,46 @@ module EagerEye
     def detect_directive(line, line_num)
       detect_file_directive(line, line_num) ||
         detect_next_line_directive(line) ||
-        detect_block_directive(line) ||
-        detect_enable_directive(line) ||
-        detect_inline_directive(line)
+        detect_block_end_directive(line) ||
+        detect_block_or_inline_directive(line)
     end
 
     def detect_file_directive(line, line_num)
       return unless line_num <= 5 && line =~ FILE_DISABLE_PATTERN
 
-      { type: :file, detectors: parse_detector_names(::Regexp.last_match(1)) }
+      detectors = parse_detector_names(::Regexp.last_match(1) || "all")
+      { type: :file, detectors: detectors }
     end
 
     def detect_next_line_directive(line)
       return unless line =~ NEXT_LINE_PATTERN
 
-      { type: :next_line, detectors: parse_detector_names(::Regexp.last_match(1)) }
+      detectors = parse_detector_names(::Regexp.last_match(1) || "all")
+      { type: :next_line, detectors: detectors }
     end
 
-    def detect_block_directive(line)
-      return unless line =~ BLOCK_DISABLE_PATTERN && !inline_disable?(line)
-
-      { type: :block_start, detectors: parse_detector_names(::Regexp.last_match(1)) }
-    end
-
-    def detect_enable_directive(line)
+    def detect_block_end_directive(line)
       return unless line =~ ENABLE_PATTERN
 
-      { type: :block_end, detectors: parse_detector_names(::Regexp.last_match(1)) }
+      detectors = parse_detector_names(::Regexp.last_match(1) || "all")
+      { type: :block_end, detectors: detectors }
     end
 
-    def detect_inline_directive(line)
+    def detect_block_or_inline_directive(line)
+      if line =~ BLOCK_START_PATTERN && !code_before_comment?(line)
+        detectors = parse_detector_names(::Regexp.last_match(1) || "all")
+        return { type: :block_start, detectors: detectors }
+      end
+
       return unless line =~ INLINE_DISABLE_PATTERN
 
-      { type: :inline, detectors: parse_detector_names(::Regexp.last_match(1)) }
+      detectors = parse_detector_names(::Regexp.last_match(1) || "all")
+
+      if code_before_comment?(line)
+        { type: :inline, detectors: detectors }
+      else
+        { type: :block_start, detectors: detectors }
+      end
     end
 
     def apply_directive(directive, line_num)
@@ -129,7 +136,14 @@ module EagerEye
       code_part && !code_part.strip.empty?
     end
 
+    def code_before_comment?(line)
+      code_part = line.split("#").first
+      code_part && !code_part.strip.empty?
+    end
+
     def parse_detector_names(str)
+      return ["all"] if str.nil? || str.strip.empty?
+
       str.split(/[,\s]+/).map(&:strip).reject(&:empty?).map do |name|
         normalize_detector_name(name)
       end

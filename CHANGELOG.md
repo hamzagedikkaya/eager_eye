@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.9] - 2025-12-26
+
+### Added
+
+- **Inline Suppression Comments** - Suppress specific warnings with RuboCop-style inline comments
+  - `# eager_eye:disable-next-line` - Suppress next line
+  - `# eager_eye:disable CallbackQuery` - Suppress specific detector inline
+  - `# eager_eye:disable-block` / `# eager_eye:enable-block` - Suppress block of code
+  - `# eager_eye:disable-file DetectorName` - Suppress entire file
+  - Supports both CamelCase and snake_case detector names
+  - Can disable all detectors with `all` keyword
+
 ## [1.0.8] - 2025-12-25
 
 ### Added
