@@ -24,7 +24,6 @@
 ---
 
 ## Table of Contents
-- [Why EagerEye?](#why-eagereye)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -41,31 +40,13 @@
 - [Development](#development)
 - [Contributing](#contributing)
 
-## Why EagerEye?
-
-Unlike runtime tools like Bullet, EagerEye:
-
-- **Runs without executing code** - Works in CI pipelines without a test suite
-- **Catches more patterns** - Detects serializer N+1s, missing counter caches, and query methods in loops
-- **Proactive detection** - Finds issues at code review time, not after deployment
-
-| Feature | EagerEye | Bullet |
-|---------|----------|--------|
-| Detection method | Static analysis | Runtime |
-| Requires test suite | No | Yes |
-| Serializer N+1 detection | Yes | Limited |
-| Counter cache suggestions | Yes | No |
-| Query methods in loops | Yes | No |
-| CI integration | Native | Requires tests |
-| False positive rate | Higher | Lower |
-
 ## Features
 
 ✨ **Detects 7 types of N+1 problems:**
 - Loop associations (queries in iterations)
 - Serializer nesting issues
 - Missing counter caches
-- Custom method queries (invisible to Bullet)
+- Custom method queries
 - Count in iteration patterns
 - Callback query N+1s
 - Pluck to array misuse
@@ -226,10 +207,10 @@ end
 
 ### 4. Custom Method Query (N+1 in query methods)
 
-Detects query methods (`.where`, `.find_by`, `.exists?`, etc.) called on associations inside loops. **These patterns are invisible to Bullet.**
+Detects query methods (`.where`, `.find_by`, `.exists?`, etc.) called on associations inside loops.
 
 ```ruby
-# Bad - Bullet CANNOT catch this
+# Bad - where inside loop
 class User < ApplicationRecord
   def supports?(team_name)
     teams.where(name: team_name).exists?
