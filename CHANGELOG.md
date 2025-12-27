@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.10] - 2025-12-26
+
+### Changed
+
+- **PluckToArray Severity Levels** - Scoped pluck is warning, `.all.pluck` is error
+  - Scoped `.pluck(:id)` → **Warning** (acceptable for small arrays)
+  - Unscoped `.all.pluck(:id)` → **Error** (loads entire table)
+  - Improved detection and suggestions for critical patterns
+
 ## [1.0.9] - 2025-12-26
 
 ### Added

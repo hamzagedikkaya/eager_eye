@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.9-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.10-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -313,25 +313,20 @@ Detects when `.pluck(:id)` or `.map(&:id)` results are used in `where` clauses i
 
 ```ruby
 # Bad - Two queries + memory overhead
-user_ids = User.active.pluck(:id)  # Query 1: SELECT id FROM users
-Post.where(user_id: user_ids)      # Query 2: SELECT * FROM posts WHERE user_id IN (1,2,3...)
-# Also holds potentially thousands of IDs in memory
+user_ids = User.active.pluck(:id)
+Post.where(user_id: user_ids)  # ⚠️ Warning
 
-# Bad - Same problem with map
-user_ids = users.map(&:id)
+# Worse - Loads entire table! 🔴 Error
+user_ids = User.all.pluck(:id)
 Post.where(user_id: user_ids)
 
-# Good - Single subquery, no memory overhead
+# Good - Single subquery
 Post.where(user_id: User.active.select(:id))
-# Single query: SELECT * FROM posts WHERE user_id IN (SELECT id FROM users WHERE active = true)
 ```
 
-**Performance comparison with 10,000 users:**
-
-| Approach | Queries | Memory | Time |
-|----------|---------|--------|------|
-| `pluck` + `where` | 2 | ~80KB for IDs | ~45ms |
-| `select` subquery | 1 | None | ~20ms |
+**Severity:**
+- ⚠️ **Warning** - Scoped `.pluck(:id)` (two queries, memory overhead)
+- 🔴 **Error** - Unscoped `.all.pluck(:id)` (loads entire table)
 
 ## Inline Suppression
 
