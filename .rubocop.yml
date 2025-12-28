@@ -31,7 +31,5 @@ Metrics/AbcSize:
 Metrics/MethodLength:
   Max: 30
 
-  Max: 150
-
 Layout/FirstArrayElementIndentation:
   EnforcedStyle: consistent
