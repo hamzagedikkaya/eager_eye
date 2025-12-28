@@ -93,6 +93,20 @@ RSpec.describe EagerEye::CLI do
         detectors = result["issues"].map { |i| i["detector"] }.uniq
         expect(detectors).to eq(["serializer_nesting"])
       end
+
+      it "supports multiple detectors in --only" do
+        cli = described_class.new([
+          fixtures_path,
+          "--only", "loop_association,missing_counter_cache",
+          "--format", "json"
+        ])
+
+        output = capture_stdout { cli.run }
+        result = JSON.parse(output)
+
+        detectors = result["issues"].map { |i| i["detector"] }.uniq
+        expect(detectors).to match_array(%w[loop_association missing_counter_cache])
+      end
     end
 
     context "with --no-color" do

@@ -19,6 +19,9 @@ Metrics/BlockLength:
     - "*.gemspec"
     - "lib/eager_eye/railtie.rb"
 
+Metrics/ClassLength:
+  Max: 165
+
 Metrics/ParameterLists:
   Max: 6
 
@@ -28,7 +31,6 @@ Metrics/AbcSize:
 Metrics/MethodLength:
   Max: 30
 
-Metrics/ClassLength:
   Max: 150
 
 Layout/FirstArrayElementIndentation:

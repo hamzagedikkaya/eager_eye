@@ -52,6 +52,34 @@ module EagerEye
       rescue Parser::SyntaxError
         nil
       end
+
+      def extract_method_args(node)
+        return [] unless node&.type == :send
+
+        node.children[2..]
+      end
+
+      def extract_symbols_from_args(args)
+        symbols = Set.new
+        return symbols if args.empty?
+
+        args.each do |arg|
+          case arg&.type
+          when :sym
+            symbols.add(arg.children[0])
+          when :hash
+            extract_symbols_from_hash(arg, symbols)
+          end
+        end
+        symbols
+      end
+
+      def extract_symbols_from_hash(hash_node, symbols)
+        hash_node.children.each do |pair|
+          key = pair.children[0]
+          symbols.add(key.children[0]) if key&.type == :sym
+        end
+      end
     end
   end
 end

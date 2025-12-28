@@ -74,7 +74,7 @@ end
 ## Code Style
 
 - Follow RuboCop rules (run `bundle exec rubocop`)
-- Maintain 90%+ test coverage
+- Maintain 95%+ test coverage
 - Document public methods
 - Keep methods small and focused
 

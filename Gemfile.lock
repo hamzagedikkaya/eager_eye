@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    eager_eye (1.0.10)
+    eager_eye (1.1.0)
       ast (~> 2.4)
       parser (~> 3.3)
 

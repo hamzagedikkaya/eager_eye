@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.0.10-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.1.0-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -152,6 +152,17 @@ posts.each { |post| post.comments.size }  # No warning
 @user = User.find(params[:id])
 @user.posts.each do |post|
   post.comments  # No warning - single user, no N+1
+end
+
+# Scope-defined preloads are recognized (v1.1.0+)
+# In Post model:
+class Post < ApplicationRecord
+  has_many :comments, -> { includes(:author) }
+end
+
+# In controller - EagerEye recognizes comments are already preloaded via scope!
+posts.each do |post|
+  post.comments.map(&:author)  # No warning - preloaded via scope
 end
 ```
 

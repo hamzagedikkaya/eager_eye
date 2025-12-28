@@ -3,6 +3,7 @@
 require_relative "eager_eye/version"
 require_relative "eager_eye/configuration"
 require_relative "eager_eye/issue"
+require_relative "eager_eye/association_parser"
 require_relative "eager_eye/detectors/base"
 require_relative "eager_eye/detectors/loop_association"
 require_relative "eager_eye/detectors/serializer_nesting"

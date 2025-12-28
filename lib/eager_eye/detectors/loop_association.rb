@@ -31,10 +31,11 @@ module EagerEye
         :loop_association
       end
 
-      def detect(ast, file_path)
+      def detect(ast, file_path, association_preloads = {})
         return [] unless ast
 
         issues = []
+        @association_preloads = association_preloads
         build_variable_maps(ast)
 
         traverse_ast(ast) do |node|
@@ -51,6 +52,8 @@ module EagerEye
 
           included = extract_included_associations(collection_node)
           included.merge(extract_variable_preloads(collection_node))
+          model_name = infer_model_name_from_collection(collection_node)
+          included.merge(get_association_preloads(model_name))
 
           find_association_calls(block_body, block_var, file_path, issues, included)
         end
@@ -59,6 +62,27 @@ module EagerEye
       end
 
       private
+
+      def get_association_preloads(model_name)
+        key = "#{model_name}#*"
+        preloaded = Set.new
+        @association_preloads&.each do |assoc_key, assocs|
+          preloaded.merge(assocs) if assoc_key.start_with?(key)
+        end
+        preloaded
+      end
+
+      def infer_model_name_from_collection(node)
+        # Infer model name from collection (posts -> Post, users -> User)
+        return nil unless node&.type == :send
+
+        # Handle: Model.includes, @var.method calls
+        receiver = node.children[0]
+        case receiver&.type
+        when :const
+          receiver.children[1].to_s
+        end
+      end
 
       def iteration_block?(node)
         return false unless node.type == :block
@@ -71,14 +95,9 @@ module EagerEye
       end
 
       def extract_block_variable(block_node)
-        args_node = block_node.children[1]
-        return nil unless args_node&.type == :args
-        return nil if args_node.children.empty?
-
-        first_arg = args_node.children[0]
-        return nil unless first_arg&.type == :arg
-
-        first_arg.children[0]
+        args = block_node&.children&.fetch(1, nil)
+        first_child = args&.children&.first
+        first_child&.type == :arg ? first_child.children[0] : nil
       end
 
       def extract_included_associations(collection_node)
@@ -101,19 +120,21 @@ module EagerEye
         @variable_preloads = {}
         @single_record_variables = Set.new
 
-        traverse_ast(ast) do |node|
-          next unless %i[lvasgn ivasgn].include?(node.type)
+        traverse_ast(ast) { |node| process_variable_assignment(node) }
+      end
 
-          var_type = node.type == :lvasgn ? :lvar : :ivar
-          var_name = node.children[0]
-          value_node = node.children[1]
-          next unless value_node
+      def process_variable_assignment(node)
+        return unless %i[lvasgn ivasgn].include?(node.type)
 
-          key = [var_type, var_name]
-          preloaded = extract_included_associations(value_node)
-          @variable_preloads[key] = preloaded unless preloaded.empty?
-          @single_record_variables.add(key) if single_record_query?(value_node)
-        end
+        var_type = node.type == :lvasgn ? :lvar : :ivar
+        var_name = node.children[0]
+        value_node = node.children[1]
+        return unless value_node
+
+        key = [var_type, var_name]
+        preloaded = extract_included_associations(value_node)
+        @variable_preloads[key] = preloaded unless preloaded.empty?
+        @single_record_variables.add(key) if single_record_query?(value_node)
       end
 
       def extract_variable_preloads(node)
@@ -130,11 +151,18 @@ module EagerEye
       end
 
       def single_record_query?(node)
+        last_send = find_last_send_method(node)
+        last_send && SINGLE_RECORD_METHODS.include?(last_send)
+      end
+
+      def find_last_send_method(node)
         current = node
-        while current&.type == :send && !SINGLE_RECORD_METHODS.include?(current.children[1])
-          current = current.children[0]
-        end
-        current&.type == :send && SINGLE_RECORD_METHODS.include?(current.children[1])
+        current = current.children[0] while current&.type == :send && !single_record_method?(current)
+        current&.type == :send ? current.children[1] : nil
+      end
+
+      def single_record_method?(node)
+        SINGLE_RECORD_METHODS.include?(node.children[1])
       end
 
       def single_record_iteration?(node)
@@ -145,67 +173,50 @@ module EagerEye
       end
 
       def extract_includes_from_method(method_node, included_set)
-        args = method_node.children[2..]
-        args&.each do |arg|
-          case arg&.type
-          when :sym
-            # includes(:product)
-            included_set.add(arg.children[0])
-          when :hash
-            # includes(product: :manufacturer)
-            extract_from_hash(arg, included_set)
-          end
-        end
+        args = extract_method_args(method_node)
+        included_set.merge(extract_symbols_from_args(args))
       end
 
       def extract_from_hash(hash_node, included_set)
-        hash_node.children.each do |pair|
-          key = pair.children[0]
-          included_set.add(key.children[0]) if key&.type == :sym
-        end
+        extract_symbols_from_hash(hash_node, included_set)
       end
 
       def find_association_calls(node, block_var, file_path, issues, included_associations = Set.new)
-        reported_associations = Set.new
-
+        reported = Set.new
         traverse_ast(node) do |child|
-          next unless child.type == :send
+          next unless should_report_issue?(child, block_var, reported, included_associations)
 
-          receiver = child.children[0]
-          method_name = child.children[1]
-
-          # Only detect direct calls on block variable (post.author, not post.author.name)
-          next unless direct_call_on_block_var?(receiver, block_var)
-          next unless likely_association?(method_name)
-
-          # Skip if association is already included
-          next if included_associations.include?(method_name)
-
-          # Avoid duplicate reports for same association on same line
-          report_key = "#{child.loc.line}:#{method_name}"
-          next if reported_associations.include?(report_key)
-
-          reported_associations << report_key
-
-          issues << create_issue(
-            file_path: file_path,
-            line_number: child.loc.line,
-            message: "Potential N+1 query: `#{block_var}.#{method_name}` called inside iteration",
-            suggestion: "Consider using `includes(:#{method_name})` on the collection before iterating"
-          )
+          add_n_plus_one_issue(child, block_var, file_path, issues, reported)
         end
       end
 
-      def direct_call_on_block_var?(receiver, block_var)
-        return false unless receiver
+      def should_report_issue?(child, block_var, reported, included)
+        return false unless child.type == :send
 
-        receiver.type == :lvar && receiver.children[0] == block_var
+        receiver = child.children[0]
+        method = child.children[1]
+        return false unless receiver&.type == :lvar && receiver.children[0] == block_var
+        return false if excluded?(method, included)
+
+        key = "#{child.loc.line}:#{method}"
+        !reported.include?(key) && reported.add(key)
       end
 
-      def likely_association?(method_name)
-        return false if EXCLUDED_METHODS.include?(method_name)
+      def excluded?(method, included)
+        EXCLUDED_METHODS.include?(method) ||
+          !ASSOCIATION_NAMES.include?(method.to_s) ||
+          included.include?(method)
+      end
 
-        ASSOCIATION_NAMES.include?(method_name.to_s)
+      def add_n_plus_one_issue(node, block_var, file_path, issues, reported)
+        method = node.children[1]
+        reported << "#{node.loc.line}:#{method}"
+        issues << create_issue(
+          file_path: file_path,
+          line_number: node.loc.line,
+          message: "Potential N+1 query: `#{block_var}.#{method}` called inside loop",
+          suggestion: "Use `includes(:#{method})` before iterating"
+        )
       end
     end
   end

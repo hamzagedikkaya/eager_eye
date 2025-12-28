@@ -14,24 +14,49 @@ module EagerEye
       pluck_to_array: Detectors::PluckToArray
     }.freeze
 
-    attr_reader :paths, :issues
+    attr_reader :paths, :issues, :association_preloads
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
       @issues = []
+      @association_preloads = {}
     end
 
     def run
       @issues = []
-
-      ruby_files.each do |file_path|
-        analyze_file(file_path)
-      end
-
+      collect_association_preloads
+      analyze_files
       @issues
     end
 
     private
+
+    def collect_association_preloads
+      model_files.each do |file_path|
+        source = File.read(file_path)
+        ast = parse_source(source)
+        next unless ast
+
+        model_name = extract_model_name(file_path)
+        parser = AssociationParser.new
+        parser.parse_model(ast, model_name)
+        @association_preloads.merge!(parser.preloaded_associations)
+      end
+    rescue StandardError
+      # Silently skip errors in association parsing
+    end
+
+    def model_files
+      Dir.glob(File.join(@paths[0], "models", "**", "*.rb"))
+    end
+
+    def extract_model_name(file_path)
+      File.basename(file_path, ".rb").camelize
+    end
+
+    def analyze_files
+      ruby_files.each { |file_path| analyze_file(file_path) }
+    end
 
     def ruby_files
       all_files = paths.flat_map do |path|
@@ -61,7 +86,10 @@ module EagerEye
       comment_parser = CommentParser.new(source)
 
       enabled_detectors.each do |detector|
-        file_issues = detector.detect(ast, file_path)
+        args = [ast, file_path]
+        args << @association_preloads if detector.is_a?(Detectors::LoopAssociation)
+
+        file_issues = detector.detect(*args)
 
         # Filter suppressed issues
         file_issues.reject! do |issue|

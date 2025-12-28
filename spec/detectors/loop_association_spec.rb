@@ -468,6 +468,22 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
         # Good file should have significantly fewer issues than bad file
         expect(good_issues.size).to be < bad_issues.size
       end
+
+      context "with single model instance" do
+        let(:code) do
+          <<~RUBY
+            user = User.find(params[:id])
+            user.posts.each do |post|
+              post.author.name
+            end
+          RUBY
+        end
+
+        it "detects single record iteration as safe" do
+          issues = detector.detect(parse(code), "test.rb")
+          expect(issues).to be_empty
+        end
+      end
     end
   end
 end

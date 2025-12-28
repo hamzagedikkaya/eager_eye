@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.10] - 2025-12-26
+## [1.1.0] - 2025-12-28
+
+### Added
+
+- **Association Scope Preloading Detection** - LoopAssociation now recognizes associations with built-in preloading
+  - Detects `has_many :posts, -> { includes(:comments) }` patterns
+  - Recognizes scope-defined preloads to reduce false positives
+  - Parses model files to extract association definitions and preload scopes
+
+## [1.0.10] - 2025-12-27
 
 ### Changed
 

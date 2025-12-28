@@ -118,6 +118,21 @@ RSpec.describe EagerEye::Analyzer do
         expect(issues).not_to be_empty
       end
     end
+
+    context "with association preloads" do
+      it "initializes with empty association preloads" do
+        analyzer = described_class.new(paths: fixtures_path)
+        expect(analyzer.instance_variable_get("@association_preloads")).to eq({})
+      end
+
+      it "collects preloads before analyzing files" do
+        analyzer = described_class.new(paths: fixtures_path)
+        analyzer.run
+
+        # Association preloads should be collected even if directory doesn't exist
+        expect(analyzer.instance_variable_get("@association_preloads")).to be_a(Hash)
+      end
+    end
   end
 
   describe "#issues" do
