@@ -48,15 +48,7 @@ module EagerEye
       end
 
       def file_section(file_path, file_issues)
-        lines = []
-        lines << colorize(file_path, :cyan)
-
-        file_issues.each do |issue|
-          lines << format_issue(issue)
-        end
-
-        lines << ""
-        lines.join("\n")
+        [colorize(file_path, :cyan), *file_issues.map { |i| format_issue(i) }, ""].join("\n")
       end
 
       def format_issue(issue)
@@ -81,15 +73,12 @@ module EagerEye
       end
 
       def summary
-        total = issues.size
-        errors = error_count
-        warnings = warning_count
-        infos = info_count
-
-        "Total: #{total} issue#{"s" unless total == 1} " \
-          "(#{errors} error#{"s" unless errors == 1}, " \
-          "#{warnings} warning#{"s" unless warnings == 1}, " \
-          "#{infos} info)"
+        t = issues.size
+        e = error_count
+        w = warning_count
+        i = info_count
+        "Total: #{t} issue#{"s" unless t == 1} " \
+          "(#{e} error#{"s" unless e == 1}, #{w} warning#{"s" unless w == 1}, #{i} info)"
       end
 
       def colorize(text, color)

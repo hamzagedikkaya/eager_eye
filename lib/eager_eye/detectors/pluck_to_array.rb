@@ -49,100 +49,67 @@ module EagerEye
         add_issue(node) if regular_pluck?(node)
       end
 
-      def local_variable_assignment?(node)
-        node.type == :lvasgn
-      end
+      def local_variable_assignment?(node) = node.type == :lvasgn
 
-      def where_call?(node)
-        node.type == :send && node.children[1] == :where
-      end
+      def where_call?(node) = node.type == :send && node.children[1] == :where
 
       def pluck_call?(node)
-        return false unless node.is_a?(Parser::AST::Node) && node.type == :send
-
-        method = node.children[1]
-        %i[pluck ids].include?(method)
+        node.is_a?(Parser::AST::Node) && node.type == :send && %i[pluck ids].include?(node.children[1])
       end
 
       def all_pluck_call?(node)
         return false unless pluck_call?(node)
 
         receiver = node.children[0]
-        receiver.is_a?(Parser::AST::Node) && receiver.type == :send &&
-          receiver.children[1] == :all
+        receiver.is_a?(Parser::AST::Node) && receiver.type == :send && receiver.children[1] == :all
       end
 
       def map_id_call?(node)
-        return false unless node.is_a?(Parser::AST::Node)
-
-        block_map?(node) || send_map?(node)
+        node.is_a?(Parser::AST::Node) && (block_map?(node) || send_map?(node))
       end
 
       def block_map?(node)
-        return false unless node.type == :block
-
-        send_node = node.children[0]
-        send_node&.type == :send && %i[map collect].include?(send_node.children[1])
+        node.type == :block && node.children[0]&.type == :send &&
+          %i[map collect].include?(node.children[0].children[1])
       end
 
       def send_map?(node)
-        return false unless node.type == :send
-
-        method = node.children[1]
-        %i[map collect].include?(method) &&
+        node.type == :send && %i[map collect].include?(node.children[1]) &&
           node.children[2..].any? { |arg| symbol_to_proc_id?(arg) }
       end
 
       def symbol_to_proc_id?(node)
         return false unless node.is_a?(Parser::AST::Node) && node.type == :block_pass
 
-        sym = node.children[0]
-        sym&.type == :sym && %i[id to_i].include?(sym.children[0])
+        node.children[0]&.type == :sym && %i[id to_i].include?(node.children[0].children[0])
       end
 
       def regular_pluck?(node)
-        where_args = node.children[2..]
-        where_args.any? { |arg| pluck_var_in_hash?(arg) }
+        node.children[2..].any? { |arg| pluck_var_in_hash?(arg) }
       end
 
       def critical_pluck?(node)
-        where_args = node.children[2..]
-        where_args.any? { |arg| critical_pluck_in_hash?(arg) }
+        node.children[2..].any? { |arg| critical_pluck_in_hash?(arg) }
       end
 
       def pluck_var_in_hash?(node)
         return false unless node.is_a?(Parser::AST::Node) && node.type == :hash
 
-        node.children.any? do |pair|
-          next false unless pair.type == :pair
-
-          pluck_value?(pair.children[1])
-        end
+        node.children.any? { |pair| pair.type == :pair && pluck_value?(pair.children[1]) }
       end
 
       def critical_pluck_in_hash?(node)
         return false unless node.is_a?(Parser::AST::Node) && node.type == :hash
 
-        node.children.any? do |pair|
-          next false unless pair.type == :pair
-
-          critical_value?(pair.children[1])
-        end
+        node.children.any? { |pair| pair.type == :pair && critical_value?(pair.children[1]) }
       end
 
       def pluck_value?(value)
-        return false unless value.type == :lvar
-
-        var_name = value.children[0]
-        @pluck_variables.key?(var_name) || @map_id_variables.key?(var_name)
+        value.type == :lvar && (@pluck_variables.key?(value.children[0]) || @map_id_variables.key?(value.children[0]))
       end
 
       def critical_value?(value)
-        if value.type == :lvar
-          @critical_pluck_variables.key?(value.children[0])
-        else
-          all_pluck_call?(value)
-        end
+        value.type == :lvar ? @critical_pluck_variables.key?(value.children[0]) : all_pluck_call?(value)
       end
 
       def add_issue(node)

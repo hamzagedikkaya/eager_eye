@@ -216,5 +216,19 @@ RSpec.describe EagerEye::CommentParser do
         expect(parser.disabled_at?(2, :count_in_iteration)).to be true
       end
     end
+
+    context "with block-start pattern on its own line" do
+      let(:source) do
+        <<~RUBY
+          # eager_eye:disable-block LoopAssociation
+          @users.each { |u| u.profile }
+        RUBY
+      end
+      let(:parser) { described_class.new(source) }
+
+      it "disables lines inside block" do
+        expect(parser.disabled_at?(2, :loop_association)).to be true
+      end
+    end
   end
 end

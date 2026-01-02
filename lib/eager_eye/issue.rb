@@ -40,20 +40,13 @@ module EagerEye
     end
 
     def ==(other)
-      return false unless other.is_a?(Issue)
-
-      detector == other.detector &&
-        file_path == other.file_path &&
-        line_number == other.line_number &&
-        message == other.message &&
-        severity == other.severity &&
-        suggestion == other.suggestion
+      other.is_a?(Issue) && to_h == other.to_h
     end
 
     alias eql? ==
 
     def hash
-      [detector, file_path, line_number, message, severity, suggestion].hash
+      to_h.hash
     end
 
     private

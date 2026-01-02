@@ -12,11 +12,7 @@ module EagerEye
       fixes = collect_fixes
       return puts "No auto-fixable issues found." if fixes.empty?
 
-      if @interactive
-        apply_interactively(fixes)
-      else
-        apply_all(fixes)
-      end
+      @interactive ? apply_interactively(fixes) : apply_all(fixes)
     end
 
     def suggest
@@ -37,12 +33,9 @@ module EagerEye
 
     def collect_fixes
       @issues.filter_map do |issue|
-        source = read_file(issue.file_path)
-        fixer = FixerRegistry.fixer_for(issue, source)
-        next unless fixer&.fixable?
-
-        fixer.diff
-      end.compact
+        fixer = FixerRegistry.fixer_for(issue, read_file(issue.file_path))
+        fixer&.fixable? ? fixer.diff : nil
+      end
     end
 
     def read_file(path)
@@ -71,7 +64,6 @@ module EagerEye
     end
 
     def apply_all(fixes)
-      # Group by file to minimize file operations
       fixes.group_by { |f| f[:file] }.each do |file, file_fixes|
         lines = File.readlines(file)
 

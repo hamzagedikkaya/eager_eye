@@ -204,5 +204,22 @@ RSpec.describe EagerEye::Detectors::PluckToArray do
         expect(issues.first.suggestion).to include("select")
       end
     end
+
+    context "with critical .all.pluck pattern" do
+      let(:code) do
+        <<~RUBY
+          Post.where(user_id: User.all.pluck(:id))
+        RUBY
+      end
+
+      it "detects critical issue with error severity" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.severity).to eq(:error)
+        expect(issues.first.message).to include(".all.pluck")
+      end
+    end
   end
 end

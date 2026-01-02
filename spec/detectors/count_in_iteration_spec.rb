@@ -255,5 +255,25 @@ RSpec.describe EagerEye::Detectors::CountInIteration do
         expect(issues.first.line_number).to eq(3)
       end
     end
+
+    context "edge cases" do
+      it "handles non-send receiver type" do
+        source = <<~RUBY
+          @users.each do |user|
+            [1, 2].count
+          end
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "handles nil receiver" do
+        source = <<~RUBY
+          @users.each { |user| count }
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+    end
   end
 end

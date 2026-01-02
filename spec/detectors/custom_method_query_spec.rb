@@ -307,5 +307,23 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues.first.line_number).to eq(3)
       end
     end
+
+    context "edge cases" do
+      it "handles literal array iteration" do
+        source = <<~RUBY
+          [1, 2, 3].each { |n| puts n }
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "handles non-node receiver" do
+        source = <<~RUBY
+          items.each { |item| 42.to_s }
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+    end
   end
 end

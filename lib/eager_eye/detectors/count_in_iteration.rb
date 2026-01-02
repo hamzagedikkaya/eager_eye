@@ -3,14 +3,8 @@
 module EagerEye
   module Detectors
     class CountInIteration < Base
-      # count always executes a COUNT query
-      # size and length use memory when collection is loaded
       COUNT_METHODS = %i[count].freeze
-
-      ITERATION_METHODS = %i[
-        each map select find_all reject collect
-        each_with_index each_with_object flat_map
-      ].freeze
+      ITERATION_METHODS = %i[each map select find_all reject collect each_with_index each_with_object flat_map].freeze
 
       def self.detector_name
         :count_in_iteration
@@ -36,74 +30,48 @@ module EagerEye
 
         if iteration_block?(node)
           block_var = extract_block_variable(node)
-          block_body = extract_block_body(node)
+          block_body = node.children[2]
           yield(block_body, block_var) if block_var && block_body
         end
 
-        node.children.each do |child|
-          find_iteration_blocks(child, &block)
-        end
+        node.children.each { |child| find_iteration_blocks(child, &block) }
       end
 
       def iteration_block?(node)
-        return false unless node.type == :block
-
-        send_node = node.children[0]
-        return false unless send_node&.type == :send
-
-        method_name = send_node.children[1]
-        ITERATION_METHODS.include?(method_name)
+        node.type == :block && node.children[0]&.type == :send &&
+          ITERATION_METHODS.include?(node.children[0].children[1])
       end
 
       def check_for_count_calls(node, block_var)
         return unless node.is_a?(Parser::AST::Node)
 
         add_issue(node) if count_on_association?(node, block_var)
-
-        node.children.each do |child|
-          check_for_count_calls(child, block_var)
-        end
+        node.children.each { |child| check_for_count_calls(child, block_var) }
       end
 
       def count_on_association?(node, block_var)
-        return false unless node.type == :send
-
-        method_name = node.children[1]
-        return false unless COUNT_METHODS.include?(method_name)
-
-        receiver = node.children[0]
-        association_call_on_block_var?(receiver, block_var)
+        node.type == :send && COUNT_METHODS.include?(node.children[1]) &&
+          association_call_on_block_var?(node.children[0], block_var)
       end
 
       def association_call_on_block_var?(node, block_var)
-        return false unless node.is_a?(Parser::AST::Node)
-        return false unless node.type == :send
+        return false unless node.is_a?(Parser::AST::Node) && node.type == :send
 
         receiver = node.children[0]
         return false unless receiver.is_a?(Parser::AST::Node)
 
-        # post.comments.count -> receiver is post.comments
-        # post.comments -> receiver is post (lvar)
-        if receiver.type == :lvar && receiver.children[0] == block_var
-          true
-        elsif receiver.type == :send
-          # Nested: post.author.posts.count
-          chain_starts_with_block_var?(receiver, block_var)
-        else
-          false
-        end
+        return true if receiver.type == :lvar && receiver.children[0] == block_var
+
+        receiver.type == :send && chain_starts_with_block_var?(receiver, block_var)
       end
 
       def chain_starts_with_block_var?(node, block_var)
         return false unless node.is_a?(Parser::AST::Node)
 
         case node.type
-        when :lvar
-          node.children[0] == block_var
-        when :send
-          chain_starts_with_block_var?(node.children[0], block_var)
-        else
-          false
+        when :lvar then node.children[0] == block_var
+        when :send then chain_starts_with_block_var?(node.children[0], block_var)
+        else false
         end
       end
 
@@ -112,13 +80,7 @@ module EagerEye
         return nil unless args_node&.type == :args
 
         first_arg = args_node.children[0]
-        return nil unless first_arg&.type == :arg
-
-        first_arg.children[0]
-      end
-
-      def extract_block_body(block_node)
-        block_node.children[2]
+        first_arg&.type == :arg ? first_arg.children[0] : nil
       end
 
       def add_issue(node)

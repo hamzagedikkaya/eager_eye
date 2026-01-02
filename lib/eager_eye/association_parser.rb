@@ -42,31 +42,15 @@ module EagerEye
     end
 
     def extract_association_name(node)
-      args = node.children[2..]
-      return nil if args.empty?
-
-      first_arg = args[0]
-      return nil unless first_arg&.type == :sym
-
-      first_arg.children[0]
+      first_arg = node.children[2]
+      first_arg&.type == :sym ? first_arg.children[0] : nil
     end
 
     def extract_preloaded_associations(node)
       preloaded = Set.new
-      args = node.children[2..]
-      return preloaded if args.empty?
-
-      # Check for block with includes/preload/eager_load
-      block_node = args.find { |arg| arg&.type == :block }
-      return preloaded unless block_node
-
-      extract_from_block(block_node, preloaded)
+      block_node = node.children[2..].find { |arg| arg&.type == :block }
+      traverse_for_preloads(block_node&.children&.[](2), preloaded) if block_node
       preloaded
-    end
-
-    def extract_from_block(block_node, preloaded)
-      block_body = block_node.children[2]
-      traverse_for_preloads(block_body, preloaded)
     end
 
     def traverse_for_preloads(node, preloaded)
@@ -78,17 +62,11 @@ module EagerEye
     end
 
     def preload_call?(node)
-      return false unless node.type == :send
-
-      method = node.children[1]
-      %i[includes preload eager_load].include?(method)
+      node.type == :send && %i[includes preload eager_load].include?(node.children[1])
     end
 
     def extract_includes_from_method(node, included)
-      args = node.children[2..]
-      return if args.empty?
-
-      args.each { |arg| add_included_sym(arg, included) }
+      node.children[2..].each { |arg| add_included_sym(arg, included) }
     end
 
     def add_included_sym(arg, included)

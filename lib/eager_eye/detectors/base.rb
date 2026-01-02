@@ -41,10 +41,7 @@ module EagerEye
         return unless node.is_a?(Parser::AST::Node)
 
         yield node
-
-        node.children.each do |child|
-          traverse_ast(child, &block)
-        end
+        node.children.each { |child| traverse_ast(child, &block) }
       end
 
       def parse_source(source)
@@ -61,14 +58,10 @@ module EagerEye
 
       def extract_symbols_from_args(args)
         symbols = Set.new
-        return symbols if args.empty?
-
         args.each do |arg|
           case arg&.type
-          when :sym
-            symbols.add(arg.children[0])
-          when :hash
-            extract_symbols_from_hash(arg, symbols)
+          when :sym then symbols.add(arg.children[0])
+          when :hash then extract_symbols_from_hash(arg, symbols)
           end
         end
         symbols

@@ -263,5 +263,37 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
         expect(issues).to be_empty
       end
     end
+
+    context "edge cases" do
+      it "handles class without body" do
+        source = "class EmptySerializer; end"
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "handles class with non-const parent" do
+        source = <<~RUBY
+          class PostSerializer < base_class
+            attribute :name do
+              object.author
+            end
+          end
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues.size).to eq(1)
+      end
+
+      it "handles record reference in block" do
+        source = <<~RUBY
+          class PostSerializer
+            attribute :name do
+              record.author.name
+            end
+          end
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues.size).to eq(1)
+      end
+    end
   end
 end

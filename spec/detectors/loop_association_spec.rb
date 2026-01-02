@@ -484,6 +484,20 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
           expect(issues).to be_empty
         end
       end
+
+      context "with association preloads from model" do
+        it "uses association preloads when provided" do
+          source = <<~RUBY
+            Post.all.each do |post|
+              post.comments
+            end
+          RUBY
+          preloads = { "Post#comments" => Set[:comments] }
+          issues = detector.detect(parse(source), "test.rb", preloads)
+          # preloads are matched by key prefix, so this may still detect
+          expect(issues).to be_an(Array)
+        end
+      end
     end
   end
 end

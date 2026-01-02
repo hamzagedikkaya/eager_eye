@@ -131,11 +131,6 @@ module EagerEye
       end
     end
 
-    def inline_disable?(line)
-      code_part = line.split("#").first
-      code_part && !code_part.strip.empty?
-    end
-
     def code_before_comment?(line)
       code_part = line.split("#").first
       code_part && !code_part.strip.empty?

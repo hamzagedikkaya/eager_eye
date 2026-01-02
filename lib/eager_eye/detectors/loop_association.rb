@@ -5,11 +5,8 @@ module EagerEye
     class LoopAssociation < Base
       ITERATION_METHODS = %i[each map collect select find find_all reject filter filter_map flat_map].freeze
       PRELOAD_METHODS = %i[includes preload eager_load].freeze
-      # Methods that return a single record (not a collection)
       SINGLE_RECORD_METHODS = %i[find find_by find_by! first first! last last! take take! second third fourth fifth
                                  forty_two sole find_sole_by].freeze
-
-      # Common association names (belongs_to = singular, has_many = plural)
       ASSOCIATION_NAMES = Set.new(%w[
         author user owner creator admin member customer client post article comment category tag
         parent company organization project task item order product account profile setting image
@@ -18,8 +15,6 @@ module EagerEye
         tasks items orders products accounts profiles settings images avatars photos attachments
         documents
       ]).freeze
-
-      # Methods that should NOT be treated as associations
       EXCLUDED_METHODS = %i[
         id to_s to_h to_a to_json to_xml inspect class object_id nil? blank? present? empty?
         any? none? size count length save save! update update! destroy destroy! delete delete!
@@ -73,46 +68,32 @@ module EagerEye
       end
 
       def infer_model_name_from_collection(node)
-        # Infer model name from collection (posts -> Post, users -> User)
         return nil unless node&.type == :send
 
-        # Handle: Model.includes, @var.method calls
         receiver = node.children[0]
-        case receiver&.type
-        when :const
-          receiver.children[1].to_s
-        end
+        receiver.children[1].to_s if receiver&.type == :const
       end
 
       def iteration_block?(node)
-        return false unless node.type == :block
-
-        send_node = node.children[0]
-        return false unless send_node&.type == :send
-
-        method_name = send_node.children[1]
-        ITERATION_METHODS.include?(method_name)
+        node.type == :block && node.children[0]&.type == :send &&
+          ITERATION_METHODS.include?(node.children[0].children[1])
       end
 
       def extract_block_variable(block_node)
-        args = block_node&.children&.fetch(1, nil)
-        first_child = args&.children&.first
-        first_child&.type == :arg ? first_child.children[0] : nil
+        args = block_node&.children&.[](1)
+        first_arg = args&.children&.first
+        first_arg&.type == :arg ? first_arg.children[0] : nil
       end
 
       def extract_included_associations(collection_node)
         included = Set.new
         return included unless collection_node&.type == :send
 
-        # Traverse through chained method calls to find includes/preload/eager_load
         current = collection_node
         while current&.type == :send
-          method_name = current.children[1]
-          extract_includes_from_method(current, included) if PRELOAD_METHODS.include?(method_name)
-
+          extract_includes_from_method(current, included) if PRELOAD_METHODS.include?(current.children[1])
           current = current.children[0]
         end
-
         included
       end
 
@@ -175,10 +156,6 @@ module EagerEye
       def extract_includes_from_method(method_node, included_set)
         args = extract_method_args(method_node)
         included_set.merge(extract_symbols_from_args(args))
-      end
-
-      def extract_from_hash(hash_node, included_set)
-        extract_symbols_from_hash(hash_node, included_set)
       end
 
       def find_association_calls(node, block_var, file_path, issues, included_associations = Set.new)

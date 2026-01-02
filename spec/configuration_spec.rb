@@ -47,6 +47,18 @@ RSpec.describe EagerEye::Configuration do
       expect(config.fail_on_issues).to be(false)
     end
   end
+
+  describe "#valid_severity?" do
+    it "returns true for valid severities" do
+      expect(config.valid_severity?(:info)).to be true
+      expect(config.valid_severity?(:warning)).to be true
+      expect(config.valid_severity?(:error)).to be true
+    end
+
+    it "returns false for invalid severities" do
+      expect(config.valid_severity?(:invalid)).to be false
+    end
+  end
 end
 
 RSpec.describe EagerEye do

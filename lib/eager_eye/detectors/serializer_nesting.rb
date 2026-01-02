@@ -3,21 +3,9 @@
 module EagerEye
   module Detectors
     class SerializerNesting < Base
-      # Serializer base classes to detect
-      SERIALIZER_PATTERNS = [
-        "ActiveModel::Serializer",
-        "ActiveModelSerializers::Model",
-        "Blueprinter::Base",
-        "Alba::Resource"
-      ].freeze
-
-      # Method names that define attributes in serializers
+      SERIALIZER_PATTERNS = %w[ActiveModel::Serializer ActiveModelSerializers::Model Blueprinter::Base Alba::Resource].freeze
       ATTRIBUTE_METHODS = %i[attribute field attributes].freeze
-
-      # Object reference names in serializers
       OBJECT_REFS = %i[object record resource].freeze
-
-      # Common association names (same as LoopAssociation)
       ASSOCIATION_NAMES = %w[
         author user owner creator admin member customer client
         post article comment category tag parent company organization
@@ -52,21 +40,16 @@ module EagerEye
       def serializer_class?(node)
         return false unless node.type == :class
 
-        # Check class name ends with Serializer, Blueprint, or Resource
         class_name = extract_class_name(node)
         return false unless class_name
 
         class_name.end_with?("Serializer", "Blueprint", "Resource") ||
-          inherits_from_serializer?(node) ||
-          includes_serializer_module?(node)
+          inherits_from_serializer?(node) || includes_serializer_module?(node)
       end
 
       def extract_class_name(class_node)
         name_node = class_node.children[0]
-        return nil unless name_node
-        return nil unless name_node.type == :const
-
-        name_node.children[1].to_s
+        name_node.children[1].to_s if name_node&.type == :const
       end
 
       def inherits_from_serializer?(class_node)
@@ -74,7 +57,7 @@ module EagerEye
         return false unless parent_node
 
         parent_name = const_to_string(parent_node)
-        SERIALIZER_PATTERNS.any? { |pattern| parent_name&.include?(pattern.split("::").last) }
+        SERIALIZER_PATTERNS.any? { |p| parent_name&.include?(p.split("::").last) }
       end
 
       def includes_serializer_module?(class_node)
@@ -82,20 +65,14 @@ module EagerEye
         return false unless body
 
         traverse_ast(body) do |node|
-          next unless node.type == :send
-
-          method = node.children[1]
-          return true if method == :include && alba_resource?(node)
+          return true if node.type == :send && node.children[1] == :include && alba_resource?(node)
         end
-
         false
       end
 
       def alba_resource?(include_node)
         arg = include_node.children[2]
-        return false unless arg
-
-        const_to_string(arg)&.include?("Alba")
+        arg && const_to_string(arg)&.include?("Alba")
       end
 
       def const_to_string(node)
@@ -103,12 +80,10 @@ module EagerEye
 
         parts = []
         current = node
-
         while current&.type == :const
           parts.unshift(current.children[1].to_s)
           current = current.children[0]
         end
-
         parts.join("::")
       end
 
@@ -117,34 +92,24 @@ module EagerEye
         return unless body
 
         traverse_ast(body) do |node|
-          next unless attribute_block?(node)
+          next unless attribute_block?(node) && node.children[2]
 
-          block_body = node.children[2]
-          next unless block_body
-
-          find_association_in_block(block_body, node, file_path, issues)
+          find_association_in_block(node.children[2], file_path, issues)
         end
       end
 
       def attribute_block?(node)
-        return false unless node.type == :block
-
-        send_node = node.children[0]
-        return false unless send_node&.type == :send
-
-        method_name = send_node.children[1]
-        ATTRIBUTE_METHODS.include?(method_name)
+        node.type == :block && node.children[0]&.type == :send &&
+          ATTRIBUTE_METHODS.include?(node.children[0].children[1])
       end
 
-      def find_association_in_block(block_body, _block_node, file_path, issues)
+      def find_association_in_block(block_body, file_path, issues)
         traverse_ast(block_body) do |node|
           next unless node.type == :send
 
           receiver = node.children[0]
           method_name = node.children[1]
-
-          next unless object_reference?(receiver)
-          next unless likely_association?(method_name)
+          next unless object_reference?(receiver) && likely_association?(method_name)
 
           issues << create_issue(
             file_path: file_path,
@@ -159,28 +124,17 @@ module EagerEye
         return false unless node
 
         case node.type
-        when :send
-          # object.something or record.something
-          receiver = node.children[0]
-          method = node.children[1]
-
-          receiver.nil? && OBJECT_REFS.include?(method)
-        when :lvar
-          # Block variable like |post|
-          true
-        else
-          false
+        when :send then node.children[0].nil? && OBJECT_REFS.include?(node.children[1])
+        when :lvar then true
+        else false
         end
       end
 
       def receiver_name(node)
         case node.type
-        when :send
-          node.children[1].to_s
-        when :lvar
-          node.children[0].to_s
-        else
-          "object"
+        when :send then node.children[1].to_s
+        when :lvar then node.children[0].to_s
+        else "object"
         end
       end
 

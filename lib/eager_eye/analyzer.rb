@@ -33,17 +33,15 @@ module EagerEye
 
     def collect_association_preloads
       model_files.each do |file_path|
-        source = File.read(file_path)
-        ast = parse_source(source)
+        ast = parse_source(File.read(file_path))
         next unless ast
 
-        model_name = extract_model_name(file_path)
         parser = AssociationParser.new
-        parser.parse_model(ast, model_name)
+        parser.parse_model(ast, extract_model_name(file_path))
         @association_preloads.merge!(parser.preloaded_associations)
       end
     rescue StandardError
-      # Silently skip errors in association parsing
+      nil
     end
 
     def model_files
@@ -84,22 +82,15 @@ module EagerEye
       return unless ast
 
       comment_parser = CommentParser.new(source)
+      min_severity = EagerEye.configuration.min_severity
 
       enabled_detectors.each do |detector|
         args = [ast, file_path]
         args << @association_preloads if detector.is_a?(Detectors::LoopAssociation)
 
         file_issues = detector.detect(*args)
-
-        # Filter suppressed issues
-        file_issues.reject! do |issue|
-          comment_parser.disabled_at?(issue.line_number, issue.detector)
-        end
-
-        # Filter by minimum severity
-        min_severity = EagerEye.configuration.min_severity
+        file_issues.reject! { |issue| comment_parser.disabled_at?(issue.line_number, issue.detector) }
         file_issues.select! { |issue| issue.meets_minimum_severity?(min_severity) }
-
         @issues.concat(file_issues)
       end
     rescue Errno::ENOENT, Errno::EACCES => e

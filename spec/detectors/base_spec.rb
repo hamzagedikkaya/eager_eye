@@ -10,6 +10,12 @@ RSpec.describe EagerEye::Detectors::Base do
     end
   end
 
+  describe ".default_severity" do
+    it "returns :warning" do
+      expect(described_class.default_severity).to eq(:warning)
+    end
+  end
+
   describe "#detect" do
     it "raises NotImplementedError" do
       expect { detector.detect(nil, "test.rb") }

@@ -10,32 +10,20 @@ module EagerEye
       namespace :eager_eye do
         desc "Analyze Rails application for N+1 query issues"
         task analyze: :environment do
-          require "eager_eye"
-
-          load_config_file
-
-          analyzer = EagerEye::Analyzer.new
-          issues = analyzer.run
-
-          reporter = EagerEye::Reporters::Console.new(issues)
-          puts reporter.report
-
-          exit 1 if issues.any? && EagerEye.configuration.fail_on_issues
+          puts run_analysis(EagerEye::Reporters::Console)
         end
 
         desc "Analyze and output results as JSON"
         task json: :environment do
+          puts run_analysis(EagerEye::Reporters::Json, pretty: true)
+        end
+
+        def run_analysis(reporter_class, **opts)
           require "eager_eye"
-
           load_config_file
-
-          analyzer = EagerEye::Analyzer.new
-          issues = analyzer.run
-
-          reporter = EagerEye::Reporters::Json.new(issues, pretty: true)
-          puts reporter.report
-
+          issues = EagerEye::Analyzer.new.run
           exit 1 if issues.any? && EagerEye.configuration.fail_on_issues
+          reporter_class.new(issues, **opts).report
         end
 
         def load_config_file
@@ -55,7 +43,6 @@ module EagerEye
       end
     end
 
-    # Generate initializer for configuration
     generators do
       require_relative "generators/install_generator"
     end

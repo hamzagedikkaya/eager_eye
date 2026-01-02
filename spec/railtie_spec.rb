@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-# NOTE: Full Railtie testing requires a Rails application context.
-# These tests verify the basic structure and configuration loading.
-
 RSpec.describe "Railtie" do
   describe "config file loading" do
     let(:config_content) do

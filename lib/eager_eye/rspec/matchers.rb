@@ -19,8 +19,7 @@ module EagerEye
         def matches?(path)
           @path = path
           configure_eager_eye
-          analyzer = build_analyzer
-          @issues = analyzer.run
+          @issues = EagerEye::Analyzer.new(paths: [@path]).run
           @issues.count <= @max_issues
         end
 
@@ -60,10 +59,6 @@ module EagerEye
             config.excluded_paths = @exclude unless @exclude.empty?
             config.fail_on_issues = false
           end
-        end
-
-        def build_analyzer
-          EagerEye::Analyzer.new(paths: [@path])
         end
       end
     end

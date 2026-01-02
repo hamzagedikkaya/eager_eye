@@ -137,9 +137,7 @@ module EagerEye
 
     def analyze
       configure_from_options!
-
-      analyzer = Analyzer.new(paths: options[:paths])
-      analyzer.run
+      Analyzer.new(paths: options[:paths]).run
     end
 
     def configure_from_options!
@@ -165,10 +163,7 @@ module EagerEye
     end
 
     def exit_code(issues)
-      return 0 unless options[:fail_on_issues]
-      return 0 if issues.empty?
-
-      1
+      options[:fail_on_issues] && issues.any? ? 1 : 0
     end
   end
 end
