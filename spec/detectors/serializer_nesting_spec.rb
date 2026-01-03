@@ -18,8 +18,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "detects nested association in attribute block" do
         source = <<~RUBY
           class PostSerializer < ActiveModel::Serializer
-            attribute :author_name do
-              object.author.name
+            attribute :authors_count do
+              object.authors.count
             end
           end
         RUBY
@@ -28,19 +28,19 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
 
         expect(issues.size).to eq(1)
         expect(issues.first.detector).to eq(:serializer_nesting)
-        expect(issues.first.message).to include("object.author")
+        expect(issues.first.message).to include("object.authors")
         expect(issues.first.line_number).to eq(3)
       end
 
       it "detects multiple nested associations" do
         source = <<~RUBY
           class PostSerializer < ActiveModel::Serializer
-            attribute :author_name do
-              object.author.name
+            attribute :authors_list do
+              object.authors.map(&:name)
             end
 
-            attribute :category_title do
-              object.category.title
+            attribute :categories_list do
+              object.categories.map(&:title)
             end
           end
         RUBY
@@ -55,8 +55,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "detects nested association in field block" do
         source = <<~RUBY
           class PostBlueprint < Blueprinter::Base
-            field :author_name do |post|
-              post.author.name
+            field :comments_list do |post|
+              post.comments.map(&:body)
             end
           end
         RUBY
@@ -64,7 +64,7 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
         issues = detector.detect(parse(source), "test.rb")
 
         expect(issues.size).to eq(1)
-        expect(issues.first.message).to include("author")
+        expect(issues.first.message).to include("comments")
       end
     end
 
@@ -74,8 +74,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
           class PostResource
             include Alba::Resource
 
-            attribute :author_name do |post|
-              post.author.name
+            attribute :tags_list do |post|
+              post.tags.map(&:name)
             end
           end
         RUBY
@@ -90,8 +90,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "detects in classes ending with Serializer" do
         source = <<~RUBY
           class UserSerializer
-            attribute :company_name do
-              object.company.name
+            attribute :projects_list do
+              object.projects.map(&:name)
             end
           end
         RUBY
@@ -118,8 +118,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "detects in classes ending with Resource" do
         source = <<~RUBY
           class UserResource
-            attribute :company_name do
-              object.company.name
+            attribute :orders_list do
+              object.orders.map(&:id)
             end
           end
         RUBY
@@ -185,8 +185,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "includes suggestion in the issue" do
         source = <<~RUBY
           class PostSerializer
-            attribute :author_name do
-              object.author.name
+            attribute :comments_list do
+              object.comments.map(&:body)
             end
           end
         RUBY
@@ -199,8 +199,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "sets correct file_path" do
         source = <<~RUBY
           class PostSerializer
-            attribute :author_name do
-              object.author.name
+            attribute :tags_list do
+              object.tags.map(&:name)
             end
           end
         RUBY
@@ -215,8 +215,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "detects deeply chained association calls" do
         source = <<~RUBY
           class OrderSerializer
-            attribute :customer_address do
-              object.customer.address.city
+            attribute :items_data do
+              object.items.map(&:name)
             end
           end
         RUBY
@@ -224,7 +224,7 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
         issues = detector.detect(parse(source), "test.rb")
 
         expect(issues.size).to eq(1)
-        expect(issues.first.message).to include("customer")
+        expect(issues.first.message).to include("items")
       end
     end
 
@@ -233,7 +233,7 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
         source = <<~RUBY
           class PostSerializer
             attribute :meta do
-              { author: object.author.name, category: object.category.title }
+              { authors: object.authors.map(&:name), categories: object.categories.map(&:title) }
             end
           end
         RUBY
@@ -274,8 +274,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "handles class with non-const parent" do
         source = <<~RUBY
           class PostSerializer < base_class
-            attribute :name do
-              object.author
+            attribute :comments_list do
+              object.comments.map(&:body)
             end
           end
         RUBY
@@ -286,8 +286,8 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       it "handles record reference in block" do
         source = <<~RUBY
           class PostSerializer
-            attribute :name do
-              record.author.name
+            attribute :tags_list do
+              record.tags.map(&:name)
             end
           end
         RUBY

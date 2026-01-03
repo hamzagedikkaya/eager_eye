@@ -1,28 +1,28 @@
 # frozen_string_literal: true
 
-# ActiveModel::Serializer style
+# ActiveModel::Serializer style - has_many associations (N+1 risk)
 class PostSerializer < ActiveModel::Serializer
-  attribute :author_name do
-    object.author.name
+  attribute :authors_list do
+    object.authors.map(&:name)
   end
 
-  attribute :category_title do
-    object.category.title
+  attribute :categories_list do
+    object.categories.map(&:title)
   end
 
   attribute :recent_comments do
-    object.comments.last(5).map { |c| c.user.name }
+    object.comments.last(5).map { |c| c.users.first.name }
   end
 end
 
 # Blueprinter style
 class ArticleBlueprint < Blueprinter::Base
-  field :author_name do |article|
-    article.author.name
+  field :authors_list do |article|
+    article.authors.map(&:name)
   end
 
-  field :editor_email do |article|
-    article.editor.email
+  field :tags_list do |article|
+    article.tags.map(&:name)
   end
 end
 
@@ -30,22 +30,22 @@ end
 class ProductResource
   include Alba::Resource
 
-  attribute :manufacturer_name do |product|
-    product.manufacturer.name
+  attribute :images_list do |product|
+    product.images.map(&:url)
   end
 
-  attribute :supplier_info do |product|
-    product.supplier.contact_info
+  attribute :attachments_list do |product|
+    product.attachments.map(&:filename)
   end
 end
 
 # Nested serializer with block
 class OrderSerializer < ActiveModel::Serializer
-  attribute :customer_details do
+  attribute :items_details do
     {
-      name: object.customer.name,
-      email: object.customer.email,
-      address: object.customer.address.full_address
+      names: object.items.map(&:name),
+      prices: object.items.map(&:price),
+      products: object.products.map(&:sku)
     }
   end
 end

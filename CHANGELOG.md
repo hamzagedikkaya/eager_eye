@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-01-03
+
+### Fixed
+
+- **SerializerNesting False Positive** - No longer flags `belongs_to` associations
+  - `user.author`, `subscription.user` etc. (singular) are now ignored
+  - Only `has_many` associations (plural names) are flagged as potential N+1
+
 ## [1.1.0] - 2025-12-28
 
 ### Added

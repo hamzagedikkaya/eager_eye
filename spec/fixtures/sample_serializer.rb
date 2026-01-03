@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class PostSerializer
-  attribute :author_name do
-    object.author.name
+  attribute :comments_list do
+    object.comments.map(&:body)
   end
 end

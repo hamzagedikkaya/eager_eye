@@ -6,11 +6,7 @@ module EagerEye
       SERIALIZER_PATTERNS = %w[ActiveModel::Serializer ActiveModelSerializers::Model Blueprinter::Base Alba::Resource].freeze
       ATTRIBUTE_METHODS = %i[attribute field attributes].freeze
       OBJECT_REFS = %i[object record resource].freeze
-      ASSOCIATION_NAMES = %w[
-        author user owner creator admin member customer client
-        post article comment category tag parent company organization
-        project task item order product account profile setting
-        image avatar photo attachment document
+      HAS_MANY_ASSOCIATIONS = %w[
         authors users owners creators admins members customers clients
         posts articles comments categories tags children companies organizations
         projects tasks items orders products accounts profiles settings
@@ -139,7 +135,7 @@ module EagerEye
       end
 
       def likely_association?(method_name)
-        ASSOCIATION_NAMES.include?(method_name.to_s)
+        HAS_MANY_ASSOCIATIONS.include?(method_name.to_s)
       end
     end
   end
