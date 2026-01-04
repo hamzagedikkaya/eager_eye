@@ -85,7 +85,57 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       end
     end
 
-    context "when iteration is inside callback" do
+    context "when iteration is inside callback with AR query on iteration variable" do
+      let(:code) do
+        <<~RUBY
+          class Order < ApplicationRecord
+            after_create :notify_subscribers
+
+            private
+
+            def notify_subscribers
+              customer.followers.each do |f|
+                f.notifications.create!(message: "New order")
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "detects the iteration as error" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
+        expect(iteration_issue).not_to be_nil
+        expect(iteration_issue.severity).to eq(:error)
+      end
+    end
+
+    context "when iteration is inside callback without AR query (e.g., Redis/Sidekiq)" do
+      let(:code) do
+        <<~RUBY
+          class Job < ApplicationRecord
+            after_destroy :delete_reset_job
+
+            private
+
+            def delete_reset_job
+              Sidekiq::ScheduledSet.new.select { |job| job.item["args"].include?(id) }.each(&:delete)
+            end
+          end
+        RUBY
+      end
+
+      it "does not detect iteration without AR query" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "when iteration has non-AR method call on iteration variable" do
       let(:code) do
         <<~RUBY
           class Order < ApplicationRecord
@@ -102,13 +152,11 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects the iteration as error" do
+      it "does not detect iteration without AR query methods" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
-        expect(iteration_issue).not_to be_nil
-        expect(iteration_issue.severity).to eq(:error)
+        expect(issues).to be_empty
       end
     end
 
@@ -186,7 +234,7 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       end
     end
 
-    context "with after_commit callback" do
+    context "with after_commit callback containing AR query" do
       let(:code) do
         <<~RUBY
           class Post < ApplicationRecord
@@ -195,7 +243,7 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
             private
 
             def sync_to_search
-              related_posts.each { |p| p.touch }
+              related_posts.each { |p| p.comments.update_all(synced: true) }
             end
           end
         RUBY
@@ -210,7 +258,52 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       end
     end
 
-    context "with after_create_commit callback" do
+    context "with after_commit callback without AR query" do
+      let(:code) do
+        <<~RUBY
+          class Post < ApplicationRecord
+            after_commit :sync_to_search
+
+            private
+
+            def sync_to_search
+              related_posts.each { |p| p.touch }
+            end
+          end
+        RUBY
+      end
+
+      it "does not detect iteration without AR query" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with after_create_commit callback containing AR query" do
+      let(:code) do
+        <<~RUBY
+          class User < ApplicationRecord
+            after_create_commit :send_welcome_email
+
+            def send_welcome_email
+              organization.admins.each { |a| a.notifications.create!(message: "Welcome!") }
+            end
+          end
+        RUBY
+      end
+
+      it "detects iteration in after_create_commit" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
+        expect(iteration_issue.message).to include("after_create_commit")
+      end
+    end
+
+    context "with after_create_commit callback without AR query" do
       let(:code) do
         <<~RUBY
           class User < ApplicationRecord
@@ -223,12 +316,11 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "detects iteration in after_create_commit" do
+      it "does not detect iteration without AR query" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
-        expect(iteration_issue.message).to include("after_create_commit")
+        expect(issues).to be_empty
       end
     end
 
@@ -347,21 +439,12 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "does not flag query when iteration variable is not the receiver" do
+      it "does not flag query or iteration when iteration variable is not the receiver" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
-        # Should only have the iteration issue (error), not query issues
-        query_issues = issues.select { |i| i.message.include?("Query method") }
-        expect(query_issues).to be_empty
-      end
-
-      it "still flags the iteration itself" do
-        ast = parse(code)
-        issues = detector.detect(ast, "test.rb")
-
-        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
-        expect(iteration_issue).not_to be_nil
+        # Should have no issues since no AR query on iteration variable
+        expect(issues).to be_empty
       end
     end
 

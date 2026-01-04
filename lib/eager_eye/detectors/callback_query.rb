@@ -85,8 +85,10 @@ module EagerEye
 
         if iteration_block?(node)
           block_var = extract_block_variable(node)
-          add_iteration_issue(node, method_name, callback_type)
-          find_query_calls_in_block(node, method_name, callback_type, block_var) if block_var
+          if block_var && contains_ar_query_on_variable?(node, block_var)
+            add_iteration_issue(node, method_name, callback_type)
+            find_query_calls_in_block(node, method_name, callback_type, block_var)
+          end
         end
 
         node.children.each { |child| find_iterations_with_queries(child, method_name, callback_type) }
@@ -154,6 +156,13 @@ module EagerEye
         else
           false
         end
+      end
+
+      def contains_ar_query_on_variable?(node, block_var)
+        return false unless node.is_a?(Parser::AST::Node)
+        return true if query_call?(node) && receiver_chain_starts_with?(node.children[0], block_var)
+
+        node.children.any? { |child| contains_ar_query_on_variable?(child, block_var) }
       end
     end
   end
