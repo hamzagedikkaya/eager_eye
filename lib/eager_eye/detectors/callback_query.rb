@@ -109,8 +109,16 @@ module EagerEye
       end
 
       def iteration_block?(node)
-        node.type == :block && node.children[0]&.type == :send &&
-          ITERATION_METHODS.include?(node.children[0].children[1])
+        return false unless node.type == :block && node.children[0]&.type == :send
+        return false unless ITERATION_METHODS.include?(node.children[0].children[1])
+
+        !static_collection?(node.children[0].children[0])
+      end
+
+      def static_collection?(node)
+        return true unless node.is_a?(Parser::AST::Node)
+
+        %i[array const irange erange].include?(node.type)
       end
 
       def add_query_issue(node, method_name, callback_type)

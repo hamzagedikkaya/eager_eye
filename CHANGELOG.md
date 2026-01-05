@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-01-04
+
+### Fixed
+
+- **CallbackQuery False Positive** - Skip iterations over constants, arrays, and ranges
+  - `CONDITIONS.each { |c| ... }` no longer triggers warning
+  - `[:a, :b].each { |x| ... }` and `(1..5).each { |i| ... }` are now ignored
+
 ## [1.1.2] - 2026-01-04
 
 ### Fixed

@@ -160,6 +160,71 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
       end
     end
 
+    context "when iteration is over a constant array" do
+      let(:code) do
+        <<~RUBY
+          class Order < ApplicationRecord
+            CONDITIONS = [:pending, :shipped].freeze
+
+            after_save :handle_conditions
+
+            def handle_conditions
+              CONDITIONS.each { |c| send("handle_\#{c}") }
+            end
+          end
+        RUBY
+      end
+
+      it "does not detect iteration over constant" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "when iteration is over an inline array" do
+      let(:code) do
+        <<~RUBY
+          class Order < ApplicationRecord
+            after_save :set_flags
+
+            def set_flags
+              [:flag1, :flag2].each { |f| self.send("\#{f}=", true) }
+            end
+          end
+        RUBY
+      end
+
+      it "does not detect iteration over inline array" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "when iteration is over a range" do
+      let(:code) do
+        <<~RUBY
+          class Order < ApplicationRecord
+            after_save :process_range
+
+            def process_range
+              (1..5).each { |i| process_item(i) }
+            end
+          end
+        RUBY
+      end
+
+      it "does not detect iteration over range" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
     context "when single update is inside callback" do
       let(:code) do
         <<~RUBY
