@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-01-06
+
+### Fixed
+
+- **SerializerNesting False Positive** - Skip ActiveStorage attachments
+  - `user.avatar.attached?`, `user.avatar.variant(...)` no longer flagged
+  - Recognizes `attached?`, `attach`, `blob`, `variant`, `purge` methods
+
 ## [1.1.3] - 2026-01-04
 
 ### Fixed

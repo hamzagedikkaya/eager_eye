@@ -6,6 +6,8 @@ module EagerEye
       SERIALIZER_PATTERNS = %w[ActiveModel::Serializer ActiveModelSerializers::Model Blueprinter::Base Alba::Resource].freeze
       ATTRIBUTE_METHODS = %i[attribute field attributes].freeze
       OBJECT_REFS = %i[object record resource].freeze
+      ACTIVE_STORAGE_METHODS = %i[attached? attach attachment attachments blob blobs purge purge_later variant
+                                  preview].freeze
       HAS_MANY_ASSOCIATIONS = %w[
         authors users owners creators admins members customers clients
         posts articles comments categories tags children companies organizations
@@ -100,8 +102,11 @@ module EagerEye
       end
 
       def find_association_in_block(block_body, file_path, issues)
+        storage_lines = collect_active_storage_lines(block_body)
+
         traverse_ast(block_body) do |node|
           next unless node.type == :send
+          next if storage_lines.include?(node.loc.line)
 
           receiver = node.children[0]
           method_name = node.children[1]
@@ -114,6 +119,16 @@ module EagerEye
             suggestion: "Eager load :#{method_name} in controller or use association serializer"
           )
         end
+      end
+
+      def collect_active_storage_lines(block_body)
+        lines = Set.new
+        traverse_ast(block_body) do |node|
+          next unless node.type == :send && ACTIVE_STORAGE_METHODS.include?(node.children[1])
+
+          lines << node.loc.line
+        end
+        lines
       end
 
       def object_reference?(node)

@@ -295,5 +295,43 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
         expect(issues.size).to eq(1)
       end
     end
+
+    context "with ActiveStorage attachments" do
+      it "does not flag attached? calls" do
+        source = <<~RUBY
+          class UserSerializer
+            field :avatar do |user|
+              user.avatar.attached?
+            end
+          end
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not flag blob/variant calls" do
+        source = <<~RUBY
+          class UserSerializer
+            field :avatar_url do |user|
+              user.avatar.variant(resize: "100x100").url
+            end
+          end
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not flag has_many_attached patterns" do
+        source = <<~RUBY
+          class PostSerializer
+            field :images_attached do |post|
+              post.images.attachments.any?
+            end
+          end
+        RUBY
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+    end
   end
 end
