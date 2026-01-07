@@ -221,5 +221,51 @@ RSpec.describe EagerEye::Detectors::PluckToArray do
         expect(issues.first.message).to include(".all.pluck")
       end
     end
+
+    context "with small collection pluck (tags, settings, etc.)" do
+      it "lowers severity to info for tags" do
+        code = <<~RUBY
+          tag_ids = prize.tags.pluck(:id)
+          user.user_tags.where(tag_id: tag_ids).destroy_all
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.severity).to eq(:info)
+      end
+
+      it "lowers severity to info for settings" do
+        code = <<~RUBY
+          setting_ids = user.settings.pluck(:id)
+          Config.where(setting_id: setting_ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.severity).to eq(:info)
+      end
+
+      it "lowers severity to info for roles" do
+        code = <<~RUBY
+          role_ids = user.roles.pluck(:id)
+          Permission.where(role_id: role_ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.severity).to eq(:info)
+      end
+
+      it "keeps warning severity for large collections" do
+        code = <<~RUBY
+          user_ids = company.users.pluck(:id)
+          Post.where(user_id: user_ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.severity).to eq(:warning)
+      end
+    end
   end
 end

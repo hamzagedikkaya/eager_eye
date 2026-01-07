@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-01-06
+
+### Changed
+
+- **PluckToArray Severity** - Lower severity to `info` for small collections
+  - `tags`, `settings`, `roles`, `permissions`, `options` etc. now `info` level
+  - Large collections remain `warning`, `.all.pluck` remains `error`
+
 ## [1.1.4] - 2026-01-06
 
 ### Fixed
