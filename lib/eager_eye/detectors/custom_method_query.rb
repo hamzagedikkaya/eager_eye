@@ -6,6 +6,7 @@ module EagerEye
       QUERY_METHODS = %i[where find_by find_by! exists? find first last take pluck ids count sum average minimum
                          maximum].freeze
       ARRAY_METHODS = %i[first last take].freeze
+      HASH_ARRAY_METHODS = %i[keys values].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
 
       def self.detector_name
@@ -56,10 +57,16 @@ module EagerEye
 
         method_name = node.children[1]
         return false unless QUERY_METHODS.include?(method_name)
-        return false if is_array_collection && ARRAY_METHODS.include?(method_name) &&
-                        receiver_is_only_block_var?(node.children[0], block_var)
+        return false if skip_array_method?(node, block_var, is_array_collection)
 
         receiver_chain_starts_with?(node.children[0], block_var)
+      end
+
+      def skip_array_method?(node, block_var, is_array_collection)
+        return false unless ARRAY_METHODS.include?(node.children[1])
+
+        receiver_ends_with_hash_array_method?(node.children[0]) ||
+          (is_array_collection && receiver_is_only_block_var?(node.children[0], block_var))
       end
 
       def receiver_is_only_block_var?(node, block_var)
@@ -89,9 +96,13 @@ module EagerEye
 
         case node.type
         when :array then true
-        when :send then %i[map select collect flat_map to_a uniq compact].include?(node.children[1])
+        when :send then %i[map select collect flat_map to_a uniq compact keys values].include?(node.children[1])
         else false
         end
+      end
+
+      def receiver_ends_with_hash_array_method?(node)
+        node.is_a?(Parser::AST::Node) && node.type == :send && HASH_ARRAY_METHODS.include?(node.children[1])
       end
 
       def add_issue(node)

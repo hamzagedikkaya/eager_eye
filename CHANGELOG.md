@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-01-09
+
+### Fixed
+
+- **CustomMethodQuery False Positive** - Skip `Hash#keys` and `Hash#values` chains
+  - `hash.keys.first`, `hash.values.last` no longer flagged as ActiveRecord queries
+  - Recognizes `keys` and `values` as Array-returning methods
+
 ## [1.1.5] - 2026-01-06
 
 ### Changed

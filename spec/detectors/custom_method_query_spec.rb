@@ -248,6 +248,22 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues).to be_empty
       end
 
+      it "does not detect Hash#keys and Hash#values methods" do
+        source = <<~RUBY
+          items.each do |item|
+            item.metadata.keys.first
+            item.metadata.values.last
+            item.config.keys.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        # Only count should be detected (not first/last on keys/values)
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".count")
+      end
+
       it "still detects queries on associations" do
         source = <<~RUBY
           @users.each do |user|
