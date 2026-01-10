@@ -264,6 +264,19 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues.first.message).to include(".count")
       end
 
+      it "does not detect String#split methods" do
+        source = <<~RUBY
+          items.each do |item|
+            item.url.split("?").first
+            item.name.split(".").last
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
       it "still detects queries on associations" do
         source = <<~RUBY
           @users.each do |user|

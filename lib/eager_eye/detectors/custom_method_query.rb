@@ -7,6 +7,7 @@ module EagerEye
                          maximum].freeze
       ARRAY_METHODS = %i[first last take].freeze
       HASH_ARRAY_METHODS = %i[keys values].freeze
+      STRING_ARRAY_METHODS = %i[split].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
 
       def self.detector_name
@@ -96,13 +97,15 @@ module EagerEye
 
         case node.type
         when :array then true
-        when :send then %i[map select collect flat_map to_a uniq compact keys values].include?(node.children[1])
+        when :send then %i[map select collect flat_map to_a uniq compact keys values split].include?(node.children[1])
         else false
         end
       end
 
       def receiver_ends_with_hash_array_method?(node)
-        node.is_a?(Parser::AST::Node) && node.type == :send && HASH_ARRAY_METHODS.include?(node.children[1])
+        return false unless node.is_a?(Parser::AST::Node) && node.type == :send
+
+        HASH_ARRAY_METHODS.include?(node.children[1]) || STRING_ARRAY_METHODS.include?(node.children[1])
       end
 
       def add_issue(node)

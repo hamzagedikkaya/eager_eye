@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.7] - 2026-01-09
+
+### Fixed
+
+- **CustomMethodQuery False Positive** - Skip `String#split` chains
+  - `url.split("?").first` no longer flagged as ActiveRecord query
+
 ## [1.1.6] - 2026-01-09
 
 ### Fixed
