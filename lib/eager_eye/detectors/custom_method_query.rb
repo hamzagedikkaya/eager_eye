@@ -8,6 +8,7 @@ module EagerEye
       ARRAY_METHODS = %i[first last take].freeze
       HASH_ARRAY_METHODS = %i[keys values].freeze
       STRING_ARRAY_METHODS = %i[split].freeze
+      BRACKET_ARRAY_METHODS = %i[[]].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
 
       def self.detector_name
@@ -64,10 +65,10 @@ module EagerEye
       end
 
       def skip_array_method?(node, block_var, is_array_collection)
-        return false unless ARRAY_METHODS.include?(node.children[1])
+        return true if receiver_ends_with_hash_array_method?(node.children[0])
 
-        receiver_ends_with_hash_array_method?(node.children[0]) ||
-          (is_array_collection && receiver_is_only_block_var?(node.children[0], block_var))
+        ARRAY_METHODS.include?(node.children[1]) &&
+          is_array_collection && receiver_is_only_block_var?(node.children[0], block_var)
       end
 
       def receiver_is_only_block_var?(node, block_var)
@@ -97,7 +98,8 @@ module EagerEye
 
         case node.type
         when :array then true
-        when :send then %i[map select collect flat_map to_a uniq compact keys values split].include?(node.children[1])
+        when :send then %i[map select collect flat_map to_a uniq compact keys values split
+                           []].include?(node.children[1])
         else false
         end
       end
@@ -105,7 +107,9 @@ module EagerEye
       def receiver_ends_with_hash_array_method?(node)
         return false unless node.is_a?(Parser::AST::Node) && node.type == :send
 
-        HASH_ARRAY_METHODS.include?(node.children[1]) || STRING_ARRAY_METHODS.include?(node.children[1])
+        HASH_ARRAY_METHODS.include?(node.children[1]) ||
+          STRING_ARRAY_METHODS.include?(node.children[1]) ||
+          BRACKET_ARRAY_METHODS.include?(node.children[1])
       end
 
       def add_issue(node)

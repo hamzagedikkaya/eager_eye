@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.8] - 2026-01-10
+
+### Fixed
+
+- **CustomMethodQuery False Positive** - Skip `[]` (bracket access) chains
+  - `data["items"].first` no longer flagged as ActiveRecord query
+  - Recognizes bracket access returns Array/Hash for subsequent enumerable calls
+
 ## [1.1.7] - 2026-01-09
 
 ### Fixed

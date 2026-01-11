@@ -259,9 +259,8 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
 
         issues = detector.detect(parse(source), "test.rb")
 
-        # Only count should be detected (not first/last on keys/values)
-        expect(issues.size).to eq(1)
-        expect(issues.first.message).to include(".count")
+        # No methods should be detected (even count is safe on keys/values)
+        expect(issues).to be_empty
       end
 
       it "does not detect String#split methods" do
@@ -269,6 +268,20 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
           items.each do |item|
             item.url.split("?").first
             item.name.split(".").last
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not detect bracket access methods" do
+        source = <<~RUBY
+          items.each do |item|
+            item["key"].first
+            item[:key].last
+            item[0].find { |x| x > 0 }
           end
         RUBY
 
