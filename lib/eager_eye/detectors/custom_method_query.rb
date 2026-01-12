@@ -96,12 +96,17 @@ module EagerEye
       def collection_is_array?(node)
         return false unless node.is_a?(Parser::AST::Node)
 
-        case node.type
-        when :array then true
-        when :send then %i[map select collect flat_map to_a uniq compact keys values split
-                           []].include?(node.children[1])
-        else false
+        return true if %i[array hash].include?(node.type)
+
+        if node.type == :send
+          method_name = node.children[1]
+          return true if %i[map select collect flat_map to_a uniq compact keys values split []
+                            params sort].include?(method_name)
+
+          return collection_is_array?(node.children[0])
         end
+
+        false
       end
 
       def receiver_ends_with_hash_array_method?(node)

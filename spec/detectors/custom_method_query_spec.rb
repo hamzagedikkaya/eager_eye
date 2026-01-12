@@ -290,6 +290,30 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues).to be_empty
       end
 
+      it "does not detect params iteration (tuple access)" do
+        source = <<~RUBY
+          params[:items].each do |item_params|
+            item_params.last
+            item_params.first
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "controller.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not detect hash literal iteration" do
+        source = <<~RUBY
+          { a: 1, b: 2 }.each do |pair|
+            pair.last
+            pair.first
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
       it "still detects queries on associations" do
         source = <<~RUBY
           @users.each do |user|
