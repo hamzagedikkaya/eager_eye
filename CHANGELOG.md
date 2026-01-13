@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.10] - 2026-01-12
+
+### Fixed
+
+- **CustomMethodQuery False Positive** - Skip `pluck` and `ids` results
+  - `Model.pluck(:id).each { |id| ... }` no longer flagged
+  - Supports tracking local variable assignments for pluck results
+
 ## [1.1.9] - 2026-01-11
 
 ### Fixed

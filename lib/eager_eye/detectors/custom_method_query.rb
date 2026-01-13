@@ -21,8 +21,8 @@ module EagerEye
         @issues = []
         @file_path = file_path
 
-        find_iteration_blocks(ast) do |block_body, block_var, collection|
-          is_array_collection = collection_is_array?(collection)
+        find_iteration_blocks(ast) do |block_body, block_var, collection, definitions|
+          is_array_collection = collection_is_array?(collection, definitions)
           check_block_for_query_methods(block_body, block_var, is_array_collection)
         end
 
@@ -31,15 +31,17 @@ module EagerEye
 
       private
 
-      def find_iteration_blocks(node, &block)
+      def find_iteration_blocks(node, definitions = {}, &block)
         return unless node.is_a?(Parser::AST::Node)
+
+        definitions[node.children[0]] = node.children[1] if node.type == :lvasgn
 
         if iteration_block?(node)
           block_var = extract_block_variable(node)
           block_body = node.children[2]
-          yield(block_body, block_var, node.children[0]) if block_var && block_body
+          yield(block_body, block_var, node.children[0], definitions) if block_var && block_body
         end
-        node.children.each { |child| find_iteration_blocks(child, &block) }
+        node.children.each { |child| find_iteration_blocks(child, definitions, &block) }
       end
 
       def iteration_block?(node)
@@ -93,20 +95,28 @@ module EagerEye
         first_arg&.type == :arg ? first_arg.children[0] : nil
       end
 
-      def collection_is_array?(node)
+      def collection_is_array?(node, definitions = {})
         return false unless node.is_a?(Parser::AST::Node)
-
         return true if %i[array hash].include?(node.type)
-
-        if node.type == :send
-          method_name = node.children[1]
-          return true if %i[map select collect flat_map to_a uniq compact keys values split []
-                            params sort].include?(method_name)
-
-          return collection_is_array?(node.children[0])
-        end
+        return check_lvar_collection?(node, definitions) if node.type == :lvar
+        return check_send_collection?(node, definitions) if node.type == :send
 
         false
+      end
+
+      def check_lvar_collection?(node, definitions)
+        return false unless definitions
+
+        definition = definitions[node.children[0]]
+        definition ? collection_is_array?(definition, definitions) : false
+      end
+
+      def check_send_collection?(node, definitions)
+        method_name = node.children[1]
+        return true if %i[map select collect flat_map to_a uniq compact keys values split []
+                          params sort pluck ids].include?(method_name)
+
+        collection_is_array?(node.children[0], definitions)
       end
 
       def receiver_ends_with_hash_array_method?(node)
