@@ -337,6 +337,43 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues).to be_empty
       end
 
+      it "does not detect count on scalar/string conversion" do
+        source = <<~RUBY
+          items.each do |item|
+            item.id.to_s.count
+            item.name.chars.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not detect count on array iteration" do
+        source = <<~RUBY
+          [[1, 2], [3, 4]].each do |arr|
+            arr.count
+            arr.sum
+            arr.find { |x| x > 0 }
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not detect variable assignment with to_s" do
+        source = <<~RUBY
+          items.each do |item|
+             str = item.to_s
+             str.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
       it "still detects queries on associations" do
         source = <<~RUBY
           @users.each do |user|

@@ -5,10 +5,8 @@ module EagerEye
     class CustomMethodQuery < Base
       QUERY_METHODS = %i[where find_by find_by! exists? find first last take pluck ids count sum average minimum
                          maximum].freeze
-      ARRAY_METHODS = %i[first last take].freeze
-      HASH_ARRAY_METHODS = %i[keys values].freeze
-      STRING_ARRAY_METHODS = %i[split].freeze
-      BRACKET_ARRAY_METHODS = %i[[]].freeze
+      SAFE_QUERY_METHODS = %i[first last take count sum find size length].freeze
+      SAFE_TRANSFORM_METHODS = %i[keys values split [] params sort pluck ids to_s to_a to_i chars bytes].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
 
       def self.detector_name
@@ -67,9 +65,9 @@ module EagerEye
       end
 
       def skip_array_method?(node, block_var, is_array_collection)
-        return true if receiver_ends_with_hash_array_method?(node.children[0])
+        return true if receiver_ends_with_safe_transform_method?(node.children[0])
 
-        ARRAY_METHODS.include?(node.children[1]) &&
+        SAFE_QUERY_METHODS.include?(node.children[1]) &&
           is_array_collection && receiver_is_only_block_var?(node.children[0], block_var)
       end
 
@@ -113,18 +111,16 @@ module EagerEye
 
       def check_send_collection?(node, definitions)
         method_name = node.children[1]
-        return true if %i[map select collect flat_map to_a uniq compact keys values split []
-                          params sort pluck ids].include?(method_name)
+        return true if %i[map select collect flat_map uniq compact].include?(method_name)
+        return true if SAFE_TRANSFORM_METHODS.include?(method_name)
 
         collection_is_array?(node.children[0], definitions)
       end
 
-      def receiver_ends_with_hash_array_method?(node)
+      def receiver_ends_with_safe_transform_method?(node)
         return false unless node.is_a?(Parser::AST::Node) && node.type == :send
 
-        HASH_ARRAY_METHODS.include?(node.children[1]) ||
-          STRING_ARRAY_METHODS.include?(node.children[1]) ||
-          BRACKET_ARRAY_METHODS.include?(node.children[1])
+        SAFE_TRANSFORM_METHODS.include?(node.children[1])
       end
 
       def add_issue(node)

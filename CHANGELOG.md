@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.11] - 2026-01-13
+
+### Fixed
+
+- **CustomMethodQuery False Positive** - Skip `count`, `sum`, `find` on safe collections
+  - `id.to_s.count` no longer flagged (scalar count)
+  - `array.count` no longer flagged inside iteration
+  - Expanded safe transform methods (`to_s`, `to_i`, `to_a`, `chars`, `bytes`)
+
 ## [1.1.10] - 2026-01-12
 
 ### Fixed
