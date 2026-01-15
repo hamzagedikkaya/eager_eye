@@ -93,28 +93,32 @@ module EagerEye
         first_arg&.type == :arg ? first_arg.children[0] : nil
       end
 
-      def collection_is_array?(node, definitions = {})
+      def collection_is_array?(node, definitions = {}, visited = Set.new)
         return false unless node.is_a?(Parser::AST::Node)
+        return false if visited.include?(node.object_id)
+
+        visited.add(node.object_id)
+
         return true if %i[array hash].include?(node.type)
-        return check_lvar_collection?(node, definitions) if node.type == :lvar
-        return check_send_collection?(node, definitions) if node.type == :send
+        return check_lvar_collection?(node, definitions, visited) if node.type == :lvar
+        return check_send_collection?(node, definitions, visited) if node.type == :send
 
         false
       end
 
-      def check_lvar_collection?(node, definitions)
+      def check_lvar_collection?(node, definitions, visited)
         return false unless definitions
 
         definition = definitions[node.children[0]]
-        definition ? collection_is_array?(definition, definitions) : false
+        definition ? collection_is_array?(definition, definitions, visited) : false
       end
 
-      def check_send_collection?(node, definitions)
+      def check_send_collection?(node, definitions, visited)
         method_name = node.children[1]
         return true if %i[map select collect flat_map uniq compact].include?(method_name)
         return true if SAFE_TRANSFORM_METHODS.include?(method_name)
 
-        collection_is_array?(node.children[0], definitions)
+        collection_is_array?(node.children[0], definitions, visited)
       end
 
       def receiver_ends_with_safe_transform_method?(node)

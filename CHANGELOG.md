@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.12] - 2026-01-15
+
+### Fixed
+
+- **CustomMethodQuery Stack Overflow** - Fix infinite recursion in `collection_is_array?`
+  - Added `visited` Set to track already-visited nodes and prevent cyclic traversal
+  - Fixes `stack level too deep` error on complex method chains
+
 ## [1.1.11] - 2026-01-13
 
 ### Fixed
