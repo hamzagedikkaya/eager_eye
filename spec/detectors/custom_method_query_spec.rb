@@ -362,6 +362,18 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues).to be_empty
       end
 
+      it "does not detect SQL alias .ids attribute access" do
+        source = <<~RUBY
+          sale_eods = EodItem.select('array_agg(id) AS ids')
+          sale_eods.each do |s_eod|
+            s_eod.ids
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
       it "does not detect variable assignment with to_s" do
         source = <<~RUBY
           items.each do |item|

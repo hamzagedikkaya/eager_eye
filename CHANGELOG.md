@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.13] - 2026-01-16
+
+### Fixed
+
+- **CustomMethodQuery False Positive** - Skip `.ids` on SQL alias attributes
+  - `s_eod.ids` no longer flagged when `ids` is a SQL alias (e.g., `select('array_agg(...) AS ids')`)
+  - Deep chains like `item.comments.ids` still correctly detected
+
 ## [1.1.12] - 2026-01-15
 
 ### Fixed

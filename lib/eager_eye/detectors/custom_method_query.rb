@@ -5,7 +5,7 @@ module EagerEye
     class CustomMethodQuery < Base
       QUERY_METHODS = %i[where find_by find_by! exists? find first last take pluck ids count sum average minimum
                          maximum].freeze
-      SAFE_QUERY_METHODS = %i[first last take count sum find size length].freeze
+      SAFE_QUERY_METHODS = %i[first last take count sum find size length ids].freeze
       SAFE_TRANSFORM_METHODS = %i[keys values split [] params sort pluck ids to_s to_a to_i chars bytes].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
 
