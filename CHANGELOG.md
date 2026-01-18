@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-01-18
+
+### Features
+
+- **Safer PluckToSelect Auto-fix** - Improved safety for `.pluck` to `.select` auto-fixer
+  - Skips `info` severity issues (small collections like `statuses`, `types`) to preserve caching
+  - Uses strict regex to ensure `.pluck` is inside `.where` arguments to prevent code breakage
+  - Prevents unsafe replacements like `User.where(active: 1).pluck(:id)` → `select` (which changes return type)
+
 ## [1.1.13] - 2026-01-16
 
 ### Fixed

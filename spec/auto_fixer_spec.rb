@@ -128,6 +128,34 @@ RSpec.describe EagerEye::Fixers::PluckToSelect do
       fixer = described_class.new(issue, source)
       expect(fixer.fixable?).to be false
     end
+
+    it "returns false for :info severity (small collections)" do
+      issue = EagerEye::Issue.new(
+        detector: :pluck_to_array,
+        file_path: "test.rb",
+        line_number: 1,
+        message: "test",
+        severity: :info
+      )
+      source = "Post.where(status: Status.pluck(:id))\n"
+
+      fixer = described_class.new(issue, source)
+      expect(fixer.fixable?).to be false
+    end
+
+    it "returns false for unsafe pattern (pluck chained after where)" do
+      issue = EagerEye::Issue.new(
+        detector: :pluck_to_array,
+        file_path: "test.rb",
+        line_number: 1,
+        message: "test",
+        severity: :warning
+      )
+      source = "User.where(active: true).pluck(:id)\n"
+
+      fixer = described_class.new(issue, source)
+      expect(fixer.fixable?).to be false
+    end
   end
 
   describe "#diff" do
