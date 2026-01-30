@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-01-31
+
+### Fixed
+
+- **PluckToArray False Positives** - Major improvements to reduce false positives:
+  - Skip when variable is used in multiple places (e.g., for ordering with `array_position`)
+  - Skip non-ActiveRecord sources: Sidekiq, Redis, Resque, DelayedJob
+  - Skip `.to_sql` usage patterns (UNION queries can't use subqueries)
+  - Skip non-AR `.where` receivers (Sidekiq::Queue, Redis, etc.)
+  - Differentiate message between `.pluck()` and `.map(&:id)` patterns
+  - Skip block maps like `.map { |u| u[:id] }` (likely Hash/Array access)
+
 ## [1.2.0] - 2026-01-18
 
 ### Features

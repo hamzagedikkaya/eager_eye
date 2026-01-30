@@ -267,5 +267,108 @@ RSpec.describe EagerEye::Detectors::PluckToArray do
         expect(issues.first.severity).to eq(:warning)
       end
     end
+
+    context "with .map(&:id) pattern" do
+      it "uses different message for map pattern" do
+        code = <<~RUBY
+          user_ids = users.map(&:id)
+          Post.where(user_id: user_ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("map(&:id)")
+        expect(issues.first.message).not_to include("plucked")
+      end
+    end
+
+    context "when variable is used multiple times" do
+      let(:code) do
+        <<~RUBY
+          ids = ordered_missions.pluck(:id)
+          result = Mission.where(id: ids)
+          sorted = result.order(Arel.sql('array_position(ARRAY[?], id)', ids))
+        RUBY
+      end
+
+      it "does not report an issue when variable is used elsewhere" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with Sidekiq source" do
+      it "does not flag Sidekiq::Queue map operations" do
+        code = <<~RUBY
+          job_ids = Sidekiq::Queue.new.map { |job| job.args[0] }
+          Integration.where(id: job_ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not flag Sidekiq::ScheduledSet operations" do
+        code = <<~RUBY
+          ids = Sidekiq::ScheduledSet.new.map(&:jid)
+          Job.where(jid: ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with Redis source" do
+      it "does not flag Redis smembers result" do
+        code = <<~RUBY
+          user_ids = redis.smembers("active_users").map(&:to_i)
+          User.where(id: user_ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with Hash/Array source" do
+      it "does not flag Hash keys/values operations" do
+        code = <<~RUBY
+          ids = top_senders.map { |u| u[:id] }
+          User.where(id: ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with .to_sql usage (UNION pattern)" do
+      it "does not flag when variable is used in .to_sql" do
+        code = <<~RUBY
+          active_ids = Mission.active.pluck(:id)
+          mission_sql = FriendshipChallenge.where(mission_id: active_ids).to_sql
+          challenge_sql = ChallengeOption.where(mission_id: active_ids).to_sql
+          from_sql = "(#\{mission_sql} UNION #\{challenge_sql}) AS combined"
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with non-ActiveRecord where call" do
+      it "does not flag Sidekiq.where calls" do
+        code = <<~RUBY
+          job_ids = jobs.pluck(:id)
+          Sidekiq::Queue.where(jid: job_ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
   end
 end

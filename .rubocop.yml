@@ -20,7 +20,7 @@ Metrics/BlockLength:
     - "lib/eager_eye/railtie.rb"
 
 Metrics/ClassLength:
-  Max: 155
+  Max: 165
 
 Metrics/ParameterLists:
   Max: 6
