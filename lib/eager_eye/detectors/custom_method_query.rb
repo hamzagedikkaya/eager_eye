@@ -7,6 +7,7 @@ module EagerEye
                          maximum].freeze
       SAFE_QUERY_METHODS = %i[first last take count sum find size length ids].freeze
       SAFE_TRANSFORM_METHODS = %i[keys values split [] params sort pluck ids to_s to_a to_i chars bytes].freeze
+      ARRAY_COLUMN_SUFFIXES = %w[_ids _tags _types _codes _names _values].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
 
       def self.detector_name
@@ -124,7 +125,13 @@ module EagerEye
       def receiver_ends_with_safe_transform_method?(node)
         return false unless node.is_a?(Parser::AST::Node) && node.type == :send
 
-        SAFE_TRANSFORM_METHODS.include?(node.children[1])
+        method_name = node.children[1]
+        SAFE_TRANSFORM_METHODS.include?(method_name) || array_column_method?(method_name)
+      end
+
+      def array_column_method?(method_name)
+        method_str = method_name.to_s
+        ARRAY_COLUMN_SUFFIXES.any? { |suffix| method_str.end_with?(suffix) }
       end
 
       def add_issue(node)

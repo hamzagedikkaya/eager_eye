@@ -19,7 +19,10 @@ module EagerEye
         id to_s to_h to_a to_json to_xml inspect class object_id nil? blank? present? empty?
         any? none? size count length save save! update update! destroy destroy! delete delete!
         valid? invalid? errors new? persisted? changed? frozen? name title body content text
-        description value key type status state created_at updated_at deleted_at
+        description value key type status state created_at updated_at deleted_at origin
+        priority level kind label code reason amount price quantity url path email phone
+        address notes memo data metadata position rank score rating enabled disabled active
+        published draft archived locked visible hidden
       ].freeze
 
       def self.detector_name

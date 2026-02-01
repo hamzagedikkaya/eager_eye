@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-01-31
+
+### Fixed
+
+- **CustomMethodQuery False Positive** - Skip PostgreSQL array column methods
+  - Methods ending with `_ids`, `_tags`, `_types`, `_codes`, `_names`, `_values` now recognized as array attributes
+  - `sector_subcategory_ids.first` no longer flagged (Ruby Array#first, not AR query)
+
+- **LoopAssociation False Positive** - Skip common non-association attribute methods
+  - Added `origin`, `priority`, `level`, `kind`, `label`, `code`, `reason`, `amount`, `price`, `quantity`, `url`, `path`, `email`, `phone`, `address`, `notes`, `memo`, `data`, `metadata`, `position`, `rank`, `score`, `rating`, `enabled`, `disabled`, `active`, `published`, `draft`, `archived`, `locked`, `visible`, `hidden` to excluded methods
+  - Note: `category` and `tag` remain detectable as they're common association names - use inline suppression if they're string attributes in your codebase
+
+- **PluckToArray False Positive** - Skip params-originated values
+  - `params[:ids].split(',').map(&:to_i)` no longer flagged
+  - `params` method now recognized as non-ActiveRecord source
+
 ## [1.2.1] - 2026-01-31
 
 ### Fixed

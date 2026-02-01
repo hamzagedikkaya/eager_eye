@@ -6,7 +6,7 @@ module EagerEye
       module NonArSourceDetector
         NON_AR_RECEIVERS = %w[Sidekiq Redis Resque DelayedJob Queue Job Hash Array Set].freeze
         NON_DB_SOURCE_METHODS = %i[smembers sinter sunion sdiff zrange zrangebyscore lrange hkeys hvals hgetall
-                                   keys values entries args].freeze
+                                   keys values entries args params].freeze
 
         private
 
