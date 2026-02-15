@@ -605,5 +605,26 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         expect(query_issue.line_number).to eq(5)
       end
     end
+
+    context "with find_each in callback" do
+      it "detects find_each iteration in callback" do
+        source = <<~RUBY
+          class Order < ApplicationRecord
+            after_create :notify_all
+
+            def notify_all
+              User.find_each do |user|
+                user.notifications.create!(message: "New order")
+              end
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        iteration_issue = issues.find { |i| i.message.include?("find_each") || i.message.include?("Iteration") }
+        expect(iteration_issue).not_to be_nil
+      end
+    end
   end
 end

@@ -463,5 +463,20 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues).to be_empty
       end
     end
+
+    context "with find_each iteration" do
+      it "detects query method inside find_each block" do
+        source = <<~RUBY
+          User.find_each do |user|
+            user.orders.where(status: "active")
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".where")
+      end
+    end
   end
 end

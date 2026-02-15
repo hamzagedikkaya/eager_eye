@@ -499,5 +499,48 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
         end
       end
     end
+
+    context "with find_each iteration" do
+      it "detects association call inside find_each block" do
+        source = <<~RUBY
+          Post.find_each do |post|
+            post.author
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.author")
+      end
+
+      it "detects association call inside find_in_batches block" do
+        source = <<~RUBY
+          Post.find_in_batches do |batch|
+            batch.each do |post|
+              post.author
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+
+      it "detects association call inside in_batches block" do
+        source = <<~RUBY
+          Post.in_batches do |batch|
+            batch.each do |post|
+              post.comments
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+    end
   end
 end

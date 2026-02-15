@@ -26,7 +26,9 @@ module EagerEye
         reload
       ].freeze
 
-      ITERATION_METHODS = %i[each map select find_all reject collect].freeze
+      ITERATION_METHODS = %i[each map select find_all reject collect
+                             find_each find_in_batches in_batches].freeze
+      AR_BATCH_METHODS = %i[find_each find_in_batches in_batches].freeze
 
       def self.detector_name
         :callback_query
@@ -110,7 +112,10 @@ module EagerEye
 
       def iteration_block?(node)
         return false unless node.type == :block && node.children[0]&.type == :send
-        return false unless ITERATION_METHODS.include?(node.children[0].children[1])
+
+        method_name = node.children[0].children[1]
+        return false unless ITERATION_METHODS.include?(method_name)
+        return true if AR_BATCH_METHODS.include?(method_name)
 
         !static_collection?(node.children[0].children[0])
       end

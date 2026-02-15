@@ -4,7 +4,8 @@ module EagerEye
   module Detectors
     class CountInIteration < Base
       COUNT_METHODS = %i[count].freeze
-      ITERATION_METHODS = %i[each map select find_all reject collect each_with_index each_with_object flat_map].freeze
+      ITERATION_METHODS = %i[each map select find_all reject collect each_with_index each_with_object flat_map
+                             find_each find_in_batches in_batches].freeze
 
       def self.detector_name
         :count_in_iteration

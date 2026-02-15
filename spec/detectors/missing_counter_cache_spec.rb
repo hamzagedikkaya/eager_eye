@@ -310,5 +310,20 @@ RSpec.describe EagerEye::Detectors::MissingCounterCache do
         expect(issues).to be_empty
       end
     end
+
+    context "with find_each iteration" do
+      it "detects count on association inside find_each" do
+        source = <<~RUBY
+          Post.find_each do |post|
+            post.comments.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("comments")
+      end
+    end
   end
 end

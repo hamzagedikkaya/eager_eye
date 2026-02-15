@@ -3,7 +3,8 @@
 module EagerEye
   module Detectors
     class LoopAssociation < Base
-      ITERATION_METHODS = %i[each map collect select find find_all reject filter filter_map flat_map].freeze
+      ITERATION_METHODS = %i[each map collect select find find_all reject filter filter_map flat_map
+                             find_each find_in_batches in_batches].freeze
       PRELOAD_METHODS = %i[includes preload eager_load].freeze
       SINGLE_RECORD_METHODS = %i[find find_by find_by! first first! last last! take take! second third fourth fifth
                                  forty_two sole find_sole_by].freeze

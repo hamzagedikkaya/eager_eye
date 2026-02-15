@@ -8,7 +8,8 @@ module EagerEye
       SAFE_QUERY_METHODS = %i[first last take count sum find size length ids].freeze
       SAFE_TRANSFORM_METHODS = %i[keys values split [] params sort pluck ids to_s to_a to_i chars bytes].freeze
       ARRAY_COLUMN_SUFFIXES = %w[_ids _tags _types _codes _names _values].freeze
-      ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map].freeze
+      ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map
+                             find_each find_in_batches in_batches].freeze
 
       def self.detector_name
         :custom_method_query

@@ -275,5 +275,20 @@ RSpec.describe EagerEye::Detectors::CountInIteration do
         expect(issues).to be_empty
       end
     end
+
+    context "with find_each iteration" do
+      it "detects .count inside find_each block" do
+        source = <<~RUBY
+          User.find_each do |user|
+            user.posts.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".count")
+      end
+    end
   end
 end

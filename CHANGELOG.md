@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-02-15
+
+### Added
+
+- **Batch Iteration Support** - All detectors now recognize `find_each`, `find_in_batches`, and `in_batches`
+  - `LoopAssociation`: Detects association calls inside `find_each` blocks
+  - `CallbackQuery`: Detects query iterations inside `find_each` in callbacks
+  - `MissingCounterCache`: Detects `.count`/`.size`/`.length` inside `find_each` blocks
+  - `CountInIteration`: Detects `.count` inside `find_each` blocks
+  - `CustomMethodQuery`: Detects `.where`/`.find_by` etc. inside `find_each` blocks
+  - Previously, `User.find_each { |u| u.posts }` was not flagged — now correctly detected as N+1
+
 ## [1.2.2] - 2026-01-31
 
 ### Fixed
