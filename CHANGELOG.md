@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-02-21
+
+### Added
+
+- **New Detector: `DelegationNPlusOne`** - Detects hidden N+1 queries caused by `delegate :method, to: :association`
+  - `delegate :name, :email, to: :user` calls inside loops load the target association on each iteration
+  - EagerEye previously could not catch these because `order.name` looks like a plain attribute, not an association access
+  - Parses model files for `delegate` declarations and tracks delegated method → association mappings
+  - Detects delegated method calls in `each`, `map`, `select`, `flat_map`, `find_each`, and all other iteration methods
+  - Respects `includes`, `preload`, and `eager_load` — suppresses warnings when the target association is preloaded
+  - Supports both local (same-file) delegate declarations and cross-file detection via model parsing
+
 ## [1.2.3] - 2026-02-15
 
 ### Added

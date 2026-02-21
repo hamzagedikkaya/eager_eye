@@ -11,20 +11,23 @@ module EagerEye
       custom_method_query: Detectors::CustomMethodQuery,
       count_in_iteration: Detectors::CountInIteration,
       callback_query: Detectors::CallbackQuery,
-      pluck_to_array: Detectors::PluckToArray
+      pluck_to_array: Detectors::PluckToArray,
+      delegation_n_plus_one: Detectors::DelegationNPlusOne
     }.freeze
 
-    attr_reader :paths, :issues, :association_preloads
+    attr_reader :paths, :issues, :association_preloads, :delegation_maps
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
       @issues = []
       @association_preloads = {}
+      @delegation_maps = {}
     end
 
     def run
       @issues = []
       collect_association_preloads
+      collect_delegation_maps
       analyze_files
       @issues
     end
@@ -39,6 +42,19 @@ module EagerEye
         parser = AssociationParser.new
         parser.parse_model(ast, extract_model_name(file_path))
         @association_preloads.merge!(parser.preloaded_associations)
+      end
+    rescue StandardError
+      nil
+    end
+
+    def collect_delegation_maps
+      model_files.each do |file_path|
+        ast = parse_source(File.read(file_path))
+        next unless ast
+
+        parser = DelegationParser.new
+        parser.parse_model(ast, extract_model_name(file_path))
+        @delegation_maps.merge!(parser.delegation_maps)
       end
     rescue StandardError
       nil
@@ -85,10 +101,7 @@ module EagerEye
       min_severity = EagerEye.configuration.min_severity
 
       enabled_detectors.each do |detector|
-        args = [ast, file_path]
-        args << @association_preloads if detector.is_a?(Detectors::LoopAssociation)
-
-        file_issues = detector.detect(*args)
+        file_issues = detector.detect(*detector_args(detector, ast, file_path))
         file_issues.reject! { |issue| comment_parser.disabled_at?(issue.line_number, issue.detector) }
         file_issues.select! { |issue| issue.meets_minimum_severity?(min_severity) }
         @issues.concat(file_issues)
@@ -101,6 +114,13 @@ module EagerEye
       Parser::CurrentRuby.parse(source)
     rescue Parser::SyntaxError
       nil
+    end
+
+    def detector_args(detector, ast, file_path)
+      args = [ast, file_path]
+      args << @association_preloads if detector.is_a?(Detectors::LoopAssociation)
+      args << @delegation_maps if detector.is_a?(Detectors::DelegationNPlusOne)
+      args
     end
 
     def enabled_detectors

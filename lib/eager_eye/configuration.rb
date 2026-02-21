@@ -8,7 +8,7 @@ module EagerEye
     DEFAULT_DETECTORS = %i[
       loop_association serializer_nesting missing_counter_cache
       custom_method_query count_in_iteration callback_query
-      pluck_to_array
+      pluck_to_array delegation_n_plus_one
     ].freeze
 
     DEFAULT_SEVERITY_LEVELS = {
@@ -18,7 +18,8 @@ module EagerEye
       custom_method_query: :warning,
       count_in_iteration: :warning,
       callback_query: :warning,
-      pluck_to_array: :warning
+      pluck_to_array: :warning,
+      delegation_n_plus_one: :warning
     }.freeze
 
     VALID_SEVERITIES = %i[info warning error].freeze

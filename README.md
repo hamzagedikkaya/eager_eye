@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.3-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.4-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -42,7 +42,7 @@
 
 ## Features
 
-✨ **Detects 7 types of N+1 problems:**
+✨ **Detects 8 types of N+1 problems:**
 - Loop associations (queries in iterations)
 - Serializer nesting issues
 - Missing counter caches
@@ -50,6 +50,7 @@
 - Count in iteration patterns
 - Callback query N+1s
 - Pluck to array misuse
+- Delegation N+1s (hidden via `delegate :method, to: :association`)
 
 🔧 **Developer-friendly:**
 - Inline suppression (like RuboCop)
@@ -339,6 +340,35 @@ Post.where(user_id: User.active.select(:id))
 - ⚠️ **Warning** - Scoped `.pluck(:id)` (two queries, memory overhead)
 - 🔴 **Error** - Unscoped `.all.pluck(:id)` (loads entire table)
 
+### 8. Delegation N+1
+
+Detects when methods delegated via `delegate :method, to: :association` are called inside loops without preloading the target association. These are invisible to `LoopAssociation` because `order.name` looks like a plain attribute, not an association access.
+
+```ruby
+# Model
+class Order < ApplicationRecord
+  belongs_to :user
+  delegate :full_name, :email, to: :user
+end
+
+# Bad - N+1 (each call hits the database for user)
+orders.each do |order|
+  order.full_name   # actually: order.user.full_name — loads user for each order!
+  order.email       # actually: order.user.email — another load!
+end
+
+# Good - Eager load the delegated-to association
+orders.includes(:user).each do |order|
+  order.full_name   # no N+1 — user is already loaded
+  order.email       # no N+1 — user is already loaded
+end
+```
+
+EagerEye detects these by:
+1. Scanning model files for `delegate :method, to: :assoc` declarations
+2. Tracking which methods delegate to which associations
+3. Flagging calls to those methods inside iteration blocks when the association is not preloaded
+
 ## Inline Suppression
 
 Suppress false positives using inline comments (RuboCop-style):
@@ -381,6 +411,7 @@ Both CamelCase and snake_case formats are accepted:
 | Count in Iteration | `CountInIteration` | `count_in_iteration` |
 | Callback Query | `CallbackQuery` | `callback_query` |
 | Pluck to Array | `PluckToArray` | `pluck_to_array` |
+| Delegation N+1 | `DelegationNPlusOne` | `delegation_n_plus_one` |
 | All Detectors | `all` | `all` |
 
 ## Auto-fix (Experimental)
@@ -483,6 +514,7 @@ enabled_detectors:
   - count_in_iteration
   - callback_query
   - pluck_to_array
+  - delegation_n_plus_one
 
 # Severity levels per detector (error, warning, info)
 severity_levels:
@@ -492,6 +524,7 @@ severity_levels:
   count_in_iteration: warning
   callback_query: warning
   pluck_to_array: warning        # Optimization
+  delegation_n_plus_one: warning # Hidden delegation N+1
   missing_counter_cache: info    # Suggestion
 
 # Minimum severity to report (default: info)
