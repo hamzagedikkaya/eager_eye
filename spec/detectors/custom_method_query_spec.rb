@@ -227,6 +227,18 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
     end
 
     context "negative cases - should NOT detect" do
+      it "does not detect .first on PostgreSQL array column (_arr suffix)" do
+        source = <<~RUBY
+          @transactions.each do |trx|
+            sector_name = trx.sector_arr.first
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
       it "does not detect query outside iteration" do
         source = <<~RUBY
           user = User.find(1)

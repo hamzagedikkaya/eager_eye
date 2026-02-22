@@ -256,6 +256,45 @@ RSpec.describe EagerEye::Detectors::CountInIteration do
       end
     end
 
+    context "when .count is called on _ids association helper (returns Array)" do
+      it "does not flag coupon_ids.count as AR query" do
+        source = <<~RUBY
+          @transactions.each do |trx|
+            total_count = trx.coupon_ids.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "does not flag other _ids suffixed methods" do
+        source = <<~RUBY
+          @orders.each do |order|
+            order.tag_ids.count
+            order.product_ids.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "still detects count on regular AR associations" do
+        source = <<~RUBY
+          @orders.each do |order|
+            order.tags.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+      end
+    end
+
     context "edge cases" do
       it "handles non-send receiver type" do
         source = <<~RUBY

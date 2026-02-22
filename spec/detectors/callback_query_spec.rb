@@ -581,12 +581,32 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
         RUBY
       end
 
-      it "includes suggestion about background jobs for iteration issues" do
+      it "includes suggestion about background jobs for after_* iteration issues" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 
         iteration_issue = issues.find { |i| i.message.include?("Iteration") }
         expect(iteration_issue.suggestion).to include("background job")
+      end
+
+      it "does not suggest background job for before_save iteration" do
+        source = <<~RUBY
+          class Order < ApplicationRecord
+            before_save :create_gray_transaction
+
+            def create_gray_transaction
+              items.each do |item|
+                item.transactions.where(active: true).first
+              end
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        iteration_issue = issues.find { |i| i.message.include?("Iteration") }
+        expect(iteration_issue.suggestion).not_to include("background job")
+        expect(iteration_issue.suggestion).to include("Preload data")
       end
 
       it "sets correct file_path" do

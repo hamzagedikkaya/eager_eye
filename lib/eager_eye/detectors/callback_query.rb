@@ -30,6 +30,8 @@ module EagerEye
                              find_each find_in_batches in_batches].freeze
       AR_BATCH_METHODS = %i[find_each find_in_batches in_batches].freeze
       NON_AR_NAMESPACES = %w[Sidekiq Redis ActionCable ActionMailer Kafka].freeze
+      TRANSACTIONAL_CALLBACKS = %i[before_validation before_save before_create before_update before_destroy
+                                   around_save around_create around_update around_destroy].freeze
 
       def self.detector_name
         :callback_query
@@ -130,24 +132,39 @@ module EagerEye
 
       def add_query_issue(node, method_name, callback_type)
         query_method = node.children[1]
+        suggestion = if transactional_callback?(callback_type)
+                       "Callbacks run on every save/create/update. Move the query outside the iteration or preload data"
+                     else
+                       "Callbacks run on every save/create/update. Consider moving to a background job"
+                     end
 
         @issues << create_issue(
           file_path: @file_path,
           line_number: node.loc.line,
           message: "Query method `.#{query_method}` found in `#{callback_type}` callback `:#{method_name}`",
           severity: :warning,
-          suggestion: "Callbacks run on every save/create/update. Consider moving to a background job"
+          suggestion: suggestion
         )
       end
 
       def add_iteration_issue(node, method_name, callback_type)
+        suggestion = if transactional_callback?(callback_type)
+                       "Avoid DB queries in before_*/around_* callbacks. Preload data outside the iteration instead"
+                     else
+                       "Avoid iterations in callbacks. Use background jobs for bulk operations"
+                     end
+
         @issues << create_issue(
           file_path: @file_path,
           line_number: node.loc.line,
           message: "Iteration found in `#{callback_type}` callback `:#{method_name}` - potential N+1",
           severity: :error,
-          suggestion: "Avoid iterations in callbacks. Use background jobs for bulk operations"
+          suggestion: suggestion
         )
+      end
+
+      def transactional_callback?(callback_type)
+        TRANSACTIONAL_CALLBACKS.include?(callback_type)
       end
 
       def extract_block_variable(block_node)

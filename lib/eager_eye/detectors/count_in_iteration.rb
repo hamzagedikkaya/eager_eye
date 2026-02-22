@@ -6,6 +6,7 @@ module EagerEye
       COUNT_METHODS = %i[count].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect each_with_index each_with_object flat_map
                              find_each find_in_batches in_batches].freeze
+      ARRAY_METHOD_SUFFIXES = %w[_ids _tags _types _codes _names _values].freeze
 
       def self.detector_name
         :count_in_iteration
@@ -52,7 +53,15 @@ module EagerEye
 
       def count_on_association?(node, block_var)
         node.type == :send && COUNT_METHODS.include?(node.children[1]) &&
+          !array_returning_method?(node.children[0]) &&
           association_call_on_block_var?(node.children[0], block_var)
+      end
+
+      def array_returning_method?(node)
+        return false unless node.is_a?(Parser::AST::Node) && node.type == :send
+
+        method_name = node.children[1].to_s
+        ARRAY_METHOD_SUFFIXES.any? { |suffix| method_name.end_with?(suffix) }
       end
 
       def association_call_on_block_var?(node, block_var)
