@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-02-21
+
+### Added
+
+- **New Detector: `DecoratorNPlusOne`** - Detects N+1 queries inside decorator/presenter classes
+  - Catches `object.comments.map(...)`, `__getobj__.items.each { ... }`, `model.posts`, `source.tags` patterns
+  - Identifies decorator classes by inheritance (`Draper::Decorator`, `SimpleDelegator`, `Delegator`) or name suffix (`Decorator`, `Presenter`, `ViewObject`)
+  - Targets all four object reference styles: `object`, `__getobj__`, `source`, `model`
+  - Skips ActiveStorage methods (`attached?`, `blob`, `variant`, etc.) to prevent false positives
+  - Suggests eager loading in the controller before decorating the collection
+
 ## [1.2.4] - 2026-02-21
 
 ### Added

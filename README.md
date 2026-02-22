@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.4-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.5-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -42,7 +42,7 @@
 
 ## Features
 
-✨ **Detects 8 types of N+1 problems:**
+✨ **Detects 9 types of N+1 problems:**
 - Loop associations (queries in iterations)
 - Serializer nesting issues
 - Missing counter caches
@@ -51,6 +51,7 @@
 - Callback query N+1s
 - Pluck to array misuse
 - Delegation N+1s (hidden via `delegate :method, to: :association`)
+- Decorator N+1s (Draper, SimpleDelegator, Presenter, ViewObject)
 
 🔧 **Developer-friendly:**
 - Inline suppression (like RuboCop)
@@ -369,6 +370,34 @@ EagerEye detects these by:
 2. Tracking which methods delegate to which associations
 3. Flagging calls to those methods inside iteration blocks when the association is not preloaded
 
+### 9. Decorator N+1
+
+Detects N+1 queries inside Draper decorators, SimpleDelegator subclasses, and classes named `Decorator`, `Presenter`, or `ViewObject`. Each decorator wraps a single record — when a collection is decorated without preloading, every method that accesses an association triggers a new query per record.
+
+```ruby
+# Bad - N+1 on each decorated post
+class PostDecorator < Draper::Decorator
+  def comment_summary
+    object.comments.map(&:body).join(", ")   # Query for each post!
+  end
+
+  def tag_list
+    object.tags.map(&:name).join(", ")        # Another query for each post!
+  end
+end
+
+# Controller - no includes = N+1
+@posts = Post.all.decorate
+
+# Good - Eager load before decorating
+@posts = Post.includes(:comments, :tags).all.decorate
+```
+
+Supports the following object references inside decorators:
+- `object` — Draper standard
+- `__getobj__` — SimpleDelegator standard
+- `source`, `model` — alternative Draper aliases
+
 ## Inline Suppression
 
 Suppress false positives using inline comments (RuboCop-style):
@@ -412,6 +441,7 @@ Both CamelCase and snake_case formats are accepted:
 | Callback Query | `CallbackQuery` | `callback_query` |
 | Pluck to Array | `PluckToArray` | `pluck_to_array` |
 | Delegation N+1 | `DelegationNPlusOne` | `delegation_n_plus_one` |
+| Decorator N+1 | `DecoratorNPlusOne` | `decorator_n_plus_one` |
 | All Detectors | `all` | `all` |
 
 ## Auto-fix (Experimental)
@@ -515,6 +545,7 @@ enabled_detectors:
   - callback_query
   - pluck_to_array
   - delegation_n_plus_one
+  - decorator_n_plus_one
 
 # Severity levels per detector (error, warning, info)
 severity_levels:
@@ -525,6 +556,7 @@ severity_levels:
   callback_query: warning
   pluck_to_array: warning        # Optimization
   delegation_n_plus_one: warning # Hidden delegation N+1
+  decorator_n_plus_one: warning  # Decorator/Presenter N+1
   missing_counter_cache: info    # Suggestion
 
 # Minimum severity to report (default: info)

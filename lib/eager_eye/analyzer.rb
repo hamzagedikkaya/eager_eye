@@ -12,7 +12,8 @@ module EagerEye
       count_in_iteration: Detectors::CountInIteration,
       callback_query: Detectors::CallbackQuery,
       pluck_to_array: Detectors::PluckToArray,
-      delegation_n_plus_one: Detectors::DelegationNPlusOne
+      delegation_n_plus_one: Detectors::DelegationNPlusOne,
+      decorator_n_plus_one: Detectors::DecoratorNPlusOne
     }.freeze
 
     attr_reader :paths, :issues, :association_preloads, :delegation_maps
