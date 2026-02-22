@@ -30,7 +30,7 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues.first.message).to include("user.teams")
       end
 
-      it "detects chained query methods (where.first)" do
+      it "detects chained query methods (where.first) as a single issue" do
         source = <<~RUBY
           @users.each do |user|
             user.teams.where(name: "Lakers").first
@@ -39,10 +39,9 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
 
         issues = detector.detect(parse(source), "test.rb")
 
-        # Both where and first are detected as query methods
-        expect(issues.size).to eq(2)
-        methods = issues.map { |i| i.message[/\.(\w+\??)/, 1] }
-        expect(methods).to include("where", "first")
+        # where.first is one chained query — report only the root (.where)
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".where")
       end
     end
 
@@ -60,7 +59,7 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues.first.message).to include(".exists?")
       end
 
-      it "detects chained where.exists?" do
+      it "detects chained where.exists? as a single issue" do
         source = <<~RUBY
           @users.each do |user|
             user.teams.where(name: "Lakers").exists?
@@ -69,8 +68,9 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
 
         issues = detector.detect(parse(source), "test.rb")
 
-        # Both where and exists? are detected
-        expect(issues.size).to eq(2)
+        # where.exists? is one chained query — report only the root (.where)
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".where")
       end
     end
 
@@ -162,8 +162,23 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
 
         issues = detector.detect(parse(source), "test.rb")
 
-        # where.first counts as 2, find_by counts as 1, pluck counts as 1 = 4 total
-        expect(issues.size).to eq(4)
+        # where.first counts as 1 (chain deduped), find_by counts as 1, pluck counts as 1 = 3 total
+        expect(issues.size).to eq(3)
+      end
+
+      it "detects chained .where.where as a single issue" do
+        source = <<~RUBY
+          missions.flat_map do |child_mission|
+            child_mission.subscriptions
+                         .where(user: subscription.user)
+                         .where(user: child_mission.all_audiences)
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".where")
       end
     end
 
@@ -195,8 +210,9 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
 
         issues = detector.detect(parse(source), "test.rb")
 
-        # where.exists? counts as 2
-        expect(issues.size).to eq(2)
+        # where.exists? is one chained query — report only the root (.where)
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".where")
       end
 
       it "detects in flat_map block" do

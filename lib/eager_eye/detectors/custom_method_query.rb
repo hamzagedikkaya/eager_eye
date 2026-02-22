@@ -62,6 +62,7 @@ module EagerEye
         method_name = node.children[1]
         return false unless QUERY_METHODS.include?(method_name)
         return false if skip_array_method?(node, block_var, is_array_collection)
+        return false if receiver_is_query_chain?(node.children[0])
 
         receiver_chain_starts_with?(node.children[0], block_var)
       end
@@ -128,6 +129,10 @@ module EagerEye
 
         method_name = node.children[1]
         SAFE_TRANSFORM_METHODS.include?(method_name) || array_column_method?(method_name)
+      end
+
+      def receiver_is_query_chain?(node)
+        node.is_a?(Parser::AST::Node) && node.type == :send && QUERY_METHODS.include?(node.children[1])
       end
 
       def array_column_method?(method_name)

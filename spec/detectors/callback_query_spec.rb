@@ -121,13 +121,42 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
             private
 
             def delete_reset_job
-              Sidekiq::ScheduledSet.new.select { |job| job.item["args"].include?(id) }.each(&:delete)
+              Sidekiq::ScheduledSet.new.select do |job|
+                job.klass == "ResetKudoLimitJob"
+              end.each do |job|
+                job.delete
+              end
             end
           end
         RUBY
       end
 
-      it "does not detect iteration without AR query" do
+      it "does not flag Sidekiq::ScheduledSet iteration as AR N+1" do
+        ast = parse(code)
+        issues = detector.detect(ast, "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "when iteration is inside callback on Redis non-AR collection" do
+      let(:code) do
+        <<~RUBY
+          class Notification < ApplicationRecord
+            after_create :broadcast
+
+            private
+
+            def broadcast
+              Redis.current.smembers("subscribers").each do |sub|
+                sub.delete
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not flag Redis collection iteration as AR N+1" do
         ast = parse(code)
         issues = detector.detect(ast, "test.rb")
 

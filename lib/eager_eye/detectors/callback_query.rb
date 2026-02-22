@@ -29,6 +29,7 @@ module EagerEye
       ITERATION_METHODS = %i[each map select find_all reject collect
                              find_each find_in_batches in_batches].freeze
       AR_BATCH_METHODS = %i[find_each find_in_batches in_batches].freeze
+      NON_AR_NAMESPACES = %w[Sidekiq Redis ActionCable ActionMailer Kafka].freeze
 
       def self.detector_name
         :callback_query
@@ -87,7 +88,8 @@ module EagerEye
 
         if iteration_block?(node)
           block_var = extract_block_variable(node)
-          if block_var && contains_ar_query_on_variable?(node, block_var)
+          collection = node.children[0].children[0]
+          if block_var && !non_ar_collection?(collection) && contains_ar_query_on_variable?(node, block_var)
             add_iteration_issue(node, method_name, callback_type)
             find_query_calls_in_block(node, method_name, callback_type, block_var)
           end
@@ -168,6 +170,22 @@ module EagerEye
           receiver_chain_starts_with?(node.children[0], block_var)
         else
           false
+        end
+      end
+
+      def non_ar_collection?(node)
+        ns = root_namespace(node)
+        ns && NON_AR_NAMESPACES.include?(ns)
+      end
+
+      def root_namespace(node)
+        return nil unless node.is_a?(Parser::AST::Node)
+
+        case node.type
+        when :const
+          node.children[0].nil? ? node.children[1].to_s : root_namespace(node.children[0])
+        when :send, :block
+          root_namespace(node.children[0])
         end
       end
 
