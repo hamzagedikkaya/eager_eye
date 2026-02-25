@@ -22,8 +22,7 @@ module EagerEye
         @file_path = file_path
 
         find_iteration_blocks(ast) do |block_body, block_var, collection, definitions|
-          is_array_collection = collection_is_array?(collection, definitions)
-          check_block_for_query_methods(block_body, block_var, is_array_collection)
+          check_block_for_query_methods(block_body, block_var, collection_is_array?(collection, definitions))
         end
 
         @issues
@@ -71,52 +70,29 @@ module EagerEye
         return true if receiver_ends_with_safe_transform_method?(node.children[0])
 
         SAFE_QUERY_METHODS.include?(node.children[1]) &&
-          is_array_collection && receiver_is_only_block_var?(node.children[0], block_var)
+          is_array_collection && direct_block_var?(node.children[0], block_var)
       end
 
-      def receiver_is_only_block_var?(node, block_var)
+      def direct_block_var?(node, block_var)
         node.is_a?(Parser::AST::Node) && node.type == :lvar && node.children[0] == block_var
-      end
-
-      def receiver_chain_starts_with?(node, block_var)
-        return false unless node.is_a?(Parser::AST::Node)
-
-        case node.type
-        when :lvar then node.children[0] == block_var
-        when :send then receiver_chain_starts_with?(node.children[0], block_var)
-        else false
-        end
-      end
-
-      def extract_block_variable(block_node)
-        args_node = block_node.children[1]
-        return nil unless args_node&.type == :args
-
-        first_arg = args_node.children[0]
-        first_arg&.type == :arg ? first_arg.children[0] : nil
       end
 
       def collection_is_array?(node, definitions = {}, visited = Set.new)
         return false unless node.is_a?(Parser::AST::Node)
-        return false if visited.include?(node.object_id)
-
-        visited.add(node.object_id)
+        return false unless visited.add?(node.object_id)
 
         return true if %i[array hash].include?(node.type)
-        return check_lvar_collection?(node, definitions, visited) if node.type == :lvar
-        return check_send_collection?(node, definitions, visited) if node.type == :send
 
-        false
+        case node.type
+        when :lvar
+          defn = definitions[node.children[0]]
+          defn && collection_is_array?(defn, definitions, visited)
+        when :send then send_returns_array?(node, definitions, visited)
+        else false
+        end
       end
 
-      def check_lvar_collection?(node, definitions, visited)
-        return false unless definitions
-
-        definition = definitions[node.children[0]]
-        definition ? collection_is_array?(definition, definitions, visited) : false
-      end
-
-      def check_send_collection?(node, definitions, visited)
+      def send_returns_array?(node, definitions, visited)
         method_name = node.children[1]
         return true if %i[map select collect flat_map uniq compact].include?(method_name)
         return true if SAFE_TRANSFORM_METHODS.include?(method_name)
@@ -128,40 +104,22 @@ module EagerEye
         return false unless node.is_a?(Parser::AST::Node) && node.type == :send
 
         method_name = node.children[1]
-        SAFE_TRANSFORM_METHODS.include?(method_name) || array_column_method?(method_name)
+        SAFE_TRANSFORM_METHODS.include?(method_name) ||
+          ARRAY_COLUMN_SUFFIXES.any? { |suffix| method_name.to_s.end_with?(suffix) }
       end
 
       def receiver_is_query_chain?(node)
         node.is_a?(Parser::AST::Node) && node.type == :send && QUERY_METHODS.include?(node.children[1])
       end
 
-      def array_column_method?(method_name)
-        method_str = method_name.to_s
-        ARRAY_COLUMN_SUFFIXES.any? { |suffix| method_str.end_with?(suffix) }
-      end
-
       def add_issue(node)
-        method_name = node.children[1]
-        association_chain = reconstruct_chain(node.children[0])
-
+        chain = reconstruct_chain(node.children[0])
         @issues << create_issue(
           file_path: @file_path,
           line_number: node.loc.line,
-          message: "Query method `.#{method_name}` called on `#{association_chain}` inside iteration",
+          message: "Query method `.#{node.children[1]}` called on `#{chain}` inside iteration",
           suggestion: "This query executes on each iteration. Consider preloading data or restructuring the query."
         )
-      end
-
-      def reconstruct_chain(node)
-        return "" unless node.is_a?(Parser::AST::Node)
-
-        case node.type
-        when :lvar then node.children[0].to_s
-        when :send
-          receiver_str = reconstruct_chain(node.children[0])
-          receiver_str.empty? ? node.children[1].to_s : "#{receiver_str}.#{node.children[1]}"
-        else ""
-        end
       end
     end
   end

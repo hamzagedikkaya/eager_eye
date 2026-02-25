@@ -15,7 +15,6 @@ module EagerEye
       def detect(ast, file_path)
         @issues = []
         @file_path = file_path
-
         return @issues unless ast
 
         find_iteration_blocks(ast) do |block_body, block_var|
@@ -60,63 +59,22 @@ module EagerEye
       def array_returning_method?(node)
         return false unless node.is_a?(Parser::AST::Node) && node.type == :send
 
-        method_name = node.children[1].to_s
-        ARRAY_METHOD_SUFFIXES.any? { |suffix| method_name.end_with?(suffix) }
+        ARRAY_METHOD_SUFFIXES.any? { |suffix| node.children[1].to_s.end_with?(suffix) }
       end
 
       def association_call_on_block_var?(node, block_var)
-        return false unless node.is_a?(Parser::AST::Node) && node.type == :send
-
-        receiver = node.children[0]
-        return false unless receiver.is_a?(Parser::AST::Node)
-
-        return true if receiver.type == :lvar && receiver.children[0] == block_var
-
-        receiver.type == :send && chain_starts_with_block_var?(receiver, block_var)
-      end
-
-      def chain_starts_with_block_var?(node, block_var)
-        return false unless node.is_a?(Parser::AST::Node)
-
-        case node.type
-        when :lvar then node.children[0] == block_var
-        when :send then chain_starts_with_block_var?(node.children[0], block_var)
-        else false
-        end
-      end
-
-      def extract_block_variable(block_node)
-        args_node = block_node.children[1]
-        return nil unless args_node&.type == :args
-
-        first_arg = args_node.children[0]
-        first_arg&.type == :arg ? first_arg.children[0] : nil
+        node.is_a?(Parser::AST::Node) && node.type == :send &&
+          receiver_chain_starts_with?(node.children[0], block_var)
       end
 
       def add_issue(node)
-        receiver_chain = reconstruct_chain(node.children[0])
-
+        chain = reconstruct_chain(node.children[0])
         @issues << create_issue(
           file_path: @file_path,
           line_number: node.loc.line,
-          message: "`.count` called on `#{receiver_chain}` inside iteration always executes a COUNT query",
+          message: "`.count` called on `#{chain}` inside iteration always executes a COUNT query",
           suggestion: "Use `.size` instead (uses loaded collection) or add `counter_cache: true`"
         )
-      end
-
-      def reconstruct_chain(node)
-        return "" unless node.is_a?(Parser::AST::Node)
-
-        case node.type
-        when :lvar
-          node.children[0].to_s
-        when :send
-          receiver_str = reconstruct_chain(node.children[0])
-          method = node.children[1]
-          receiver_str.empty? ? method.to_s : "#{receiver_str}.#{method}"
-        else
-          ""
-        end
       end
     end
   end

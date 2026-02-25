@@ -19,17 +19,13 @@ module EagerEye
         issues.group_by(&:file_path)
       end
 
-      def info_count
-        issues.count { |i| i.severity == :info }
+      def severity_counts
+        @severity_counts ||= issues.map(&:severity).tally
       end
 
-      def warning_count
-        issues.count { |i| i.severity == :warning }
-      end
-
-      def error_count
-        issues.count { |i| i.severity == :error }
-      end
+      def info_count = severity_counts.fetch(:info, 0)
+      def warning_count = severity_counts.fetch(:warning, 0)
+      def error_count = severity_counts.fetch(:error, 0)
     end
   end
 end

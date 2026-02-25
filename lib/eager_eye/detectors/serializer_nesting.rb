@@ -1,19 +1,15 @@
 # frozen_string_literal: true
 
+require_relative "concerns/class_inspector"
+
 module EagerEye
   module Detectors
     class SerializerNesting < Base
+      include Concerns::ClassInspector
+
       SERIALIZER_PATTERNS = %w[ActiveModel::Serializer ActiveModelSerializers::Model Blueprinter::Base Alba::Resource].freeze
       ATTRIBUTE_METHODS = %i[attribute field attributes].freeze
       OBJECT_REFS = %i[object record resource].freeze
-      ACTIVE_STORAGE_METHODS = %i[attached? attach attachment attachments blob blobs purge purge_later variant
-                                  preview].freeze
-      HAS_MANY_ASSOCIATIONS = %w[
-        authors users owners creators admins members customers clients
-        posts articles comments categories tags children companies organizations
-        projects tasks items orders products accounts profiles settings
-        images avatars photos attachments documents
-      ].freeze
 
       def self.detector_name
         :serializer_nesting
@@ -23,31 +19,22 @@ module EagerEye
         return [] unless ast
 
         issues = []
-
         traverse_ast(ast) do |node|
-          next unless serializer_class?(node)
+          next unless node.type == :class && serializer_class?(node)
 
           find_nested_associations(node, file_path, issues)
         end
-
         issues
       end
 
       private
 
       def serializer_class?(node)
-        return false unless node.type == :class
-
         class_name = extract_class_name(node)
         return false unless class_name
 
         class_name.end_with?("Serializer", "Blueprint", "Resource") ||
           inherits_from_serializer?(node) || includes_serializer_module?(node)
-      end
-
-      def extract_class_name(class_node)
-        name_node = class_node.children[0]
-        name_node.children[1].to_s if name_node&.type == :const
       end
 
       def inherits_from_serializer?(class_node)
@@ -71,18 +58,6 @@ module EagerEye
       def alba_resource?(include_node)
         arg = include_node.children[2]
         arg && const_to_string(arg)&.include?("Alba")
-      end
-
-      def const_to_string(node)
-        return nil unless node&.type == :const
-
-        parts = []
-        current = node
-        while current&.type == :const
-          parts.unshift(current.children[1].to_s)
-          current = current.children[0]
-        end
-        parts.join("::")
       end
 
       def find_nested_associations(class_node, file_path, issues)
@@ -121,16 +96,6 @@ module EagerEye
         end
       end
 
-      def collect_active_storage_lines(block_body)
-        lines = Set.new
-        traverse_ast(block_body) do |node|
-          next unless node.type == :send && ACTIVE_STORAGE_METHODS.include?(node.children[1])
-
-          lines << node.loc.line
-        end
-        lines
-      end
-
       def object_reference?(node)
         return false unless node
 
@@ -147,10 +112,6 @@ module EagerEye
         when :lvar then node.children[0].to_s
         else "object"
         end
-      end
-
-      def likely_association?(method_name)
-        HAS_MANY_ASSOCIATIONS.include?(method_name.to_s)
       end
     end
   end

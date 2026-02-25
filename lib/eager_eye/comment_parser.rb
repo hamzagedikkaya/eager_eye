@@ -5,7 +5,6 @@ module EagerEye
     FILE_DISABLE_PATTERN = /eager_eye:disable-file\s+(.+?)(?:\s+--|$)/i
     NEXT_LINE_PATTERN = /eager_eye:disable-next-line(?:\s+(.+?))?(?:\s+--|$)/i
     BLOCK_START_PATTERN = /eager_eye:disable-block(?:\s+(.+?))?(?:\s+--|$)/i
-    BLOCK_END_PATTERN = /eager_eye:enable-block(?:\s+(.+?))?(?:\s+--|$)/i
     INLINE_DISABLE_PATTERN = /eager_eye:disable\s+(.+?)(?:\s+--|$)/i
     ENABLE_PATTERN = /eager_eye:enable(?:\s+(.+?))?(?:\s+--|$)/i
 

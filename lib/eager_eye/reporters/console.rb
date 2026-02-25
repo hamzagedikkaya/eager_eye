@@ -73,12 +73,12 @@ module EagerEye
       end
 
       def summary
-        t = issues.size
-        e = error_count
-        w = warning_count
-        i = info_count
-        "Total: #{t} issue#{"s" unless t == 1} " \
-          "(#{e} error#{"s" unless e == 1}, #{w} warning#{"s" unless w == 1}, #{i} info)"
+        "Total: #{pluralize(issues.size, "issue")} " \
+          "(#{pluralize(error_count, "error")}, #{pluralize(warning_count, "warning")}, #{info_count} info)"
+      end
+
+      def pluralize(count, word)
+        "#{count} #{word}#{"s" unless count == 1}"
       end
 
       def colorize(text, color)

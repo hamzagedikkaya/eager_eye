@@ -41,7 +41,6 @@ module EagerEye
         @issues = []
         @file_path = file_path
         @callback_methods = {}
-
         return @issues unless ast
 
         find_callback_definitions(ast)
@@ -67,9 +66,7 @@ module EagerEye
         node.children[2..].each do |arg|
           next unless arg.is_a?(Parser::AST::Node) && arg.type == :sym
 
-          method_name = arg.children[0]
-          callback_type = node.children[1]
-          @callback_methods[method_name] = callback_type
+          @callback_methods[arg.children[0]] = node.children[1]
         end
       end
 
@@ -77,9 +74,8 @@ module EagerEye
         return unless node.is_a?(Parser::AST::Node)
 
         if node.type == :def && @callback_methods.key?(node.children[0])
-          method_name = node.children[0]
           body = node.children[2]
-          find_iterations_with_queries(body, method_name, @callback_methods[method_name]) if body
+          find_iterations_with_queries(body, node.children[0], @callback_methods[node.children[0]]) if body
         end
 
         node.children.each { |child| check_callback_methods(child) }
@@ -131,7 +127,6 @@ module EagerEye
       end
 
       def add_query_issue(node, method_name, callback_type)
-        query_method = node.children[1]
         suggestion = if transactional_callback?(callback_type)
                        "Callbacks run on every save/create/update. Move the query outside the iteration or preload data"
                      else
@@ -141,7 +136,7 @@ module EagerEye
         @issues << create_issue(
           file_path: @file_path,
           line_number: node.loc.line,
-          message: "Query method `.#{query_method}` found in `#{callback_type}` callback `:#{method_name}`",
+          message: "Query method `.#{node.children[1]}` found in `#{callback_type}` callback `:#{method_name}`",
           severity: :warning,
           suggestion: suggestion
         )
@@ -167,29 +162,6 @@ module EagerEye
         TRANSACTIONAL_CALLBACKS.include?(callback_type)
       end
 
-      def extract_block_variable(block_node)
-        args_node = block_node.children[1]
-        return nil unless args_node&.type == :args
-
-        first_arg = args_node.children[0]
-        return nil unless first_arg&.type == :arg
-
-        first_arg.children[0]
-      end
-
-      def receiver_chain_starts_with?(node, block_var)
-        return false unless node.is_a?(Parser::AST::Node)
-
-        case node.type
-        when :lvar
-          node.children[0] == block_var
-        when :send
-          receiver_chain_starts_with?(node.children[0], block_var)
-        else
-          false
-        end
-      end
-
       def non_ar_collection?(node)
         ns = root_namespace(node)
         ns && NON_AR_NAMESPACES.include?(ns)
@@ -199,10 +171,8 @@ module EagerEye
         return nil unless node.is_a?(Parser::AST::Node)
 
         case node.type
-        when :const
-          node.children[0].nil? ? node.children[1].to_s : root_namespace(node.children[0])
-        when :send, :block
-          root_namespace(node.children[0])
+        when :const then node.children[0].nil? ? node.children[1].to_s : root_namespace(node.children[0])
+        when :send, :block then root_namespace(node.children[0])
         end
       end
 

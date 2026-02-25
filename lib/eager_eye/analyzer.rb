@@ -27,38 +27,30 @@ module EagerEye
 
     def run
       @issues = []
-      collect_association_preloads
-      collect_delegation_maps
-      analyze_files
+      collect_model_metadata
+      ruby_files.each { |file_path| analyze_file(file_path) }
       @issues
     end
 
     private
 
-    def collect_association_preloads
+    def collect_model_metadata
       model_files.each do |file_path|
         ast = parse_source(File.read(file_path))
         next unless ast
 
-        parser = AssociationParser.new
-        parser.parse_model(ast, extract_model_name(file_path))
-        @association_preloads.merge!(parser.preloaded_associations)
-      end
-    rescue StandardError
-      nil
-    end
+        model_name = extract_model_name(file_path)
 
-    def collect_delegation_maps
-      model_files.each do |file_path|
-        ast = parse_source(File.read(file_path))
-        next unless ast
+        assoc_parser = AssociationParser.new
+        assoc_parser.parse_model(ast, model_name)
+        @association_preloads.merge!(assoc_parser.preloaded_associations)
 
-        parser = DelegationParser.new
-        parser.parse_model(ast, extract_model_name(file_path))
-        @delegation_maps.merge!(parser.delegation_maps)
+        deleg_parser = DelegationParser.new
+        deleg_parser.parse_model(ast, model_name)
+        @delegation_maps.merge!(deleg_parser.delegation_maps)
+      rescue Errno::ENOENT, Errno::EACCES
+        next
       end
-    rescue StandardError
-      nil
     end
 
     def model_files
@@ -66,25 +58,19 @@ module EagerEye
     end
 
     def extract_model_name(file_path)
-      File.basename(file_path, ".rb").camelize
-    end
-
-    def analyze_files
-      ruby_files.each { |file_path| analyze_file(file_path) }
+      name = File.basename(file_path, ".rb")
+      name.respond_to?(:camelize) ? name.camelize : name.split("_").map(&:capitalize).join
     end
 
     def ruby_files
-      all_files = paths.flat_map do |path|
-        if File.file?(path)
-          [path]
-        elsif File.directory?(path)
-          Dir.glob(File.join(path, "**", "*.rb"))
-        else
-          Dir.glob(path)
-        end
-      end
+      paths.flat_map { |path| resolve_path(path) }.reject { |file| excluded?(file) }
+    end
 
-      all_files.reject { |file| excluded?(file) }
+    def resolve_path(path)
+      return [path] if File.file?(path)
+      return Dir.glob(File.join(path, "**", "*.rb")) if File.directory?(path)
+
+      Dir.glob(path)
     end
 
     def excluded?(file_path)
@@ -103,9 +89,10 @@ module EagerEye
 
       enabled_detectors.each do |detector|
         file_issues = detector.detect(*detector_args(detector, ast, file_path))
-        file_issues.reject! { |issue| comment_parser.disabled_at?(issue.line_number, issue.detector) }
-        file_issues.select! { |issue| issue.meets_minimum_severity?(min_severity) }
-        @issues.concat(file_issues)
+        @issues.concat(file_issues.select do |issue|
+          !comment_parser.disabled_at?(issue.line_number, issue.detector) &&
+            issue.meets_minimum_severity?(min_severity)
+        end)
       end
     rescue Errno::ENOENT, Errno::EACCES => e
       warn "EagerEye: Could not read file #{file_path}: #{e.message}"
@@ -126,8 +113,7 @@ module EagerEye
 
     def enabled_detectors
       @enabled_detectors ||= EagerEye.configuration.enabled_detectors.filter_map do |name|
-        detector_class = DETECTOR_CLASSES[name]
-        detector_class&.new
+        DETECTOR_CLASSES[name]&.new
       end
     end
   end

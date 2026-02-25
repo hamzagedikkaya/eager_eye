@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-02-25
+
+### Changed
+
+- Extract shared class-inspection logic into `ClassInspector` concern to reduce duplication across detectors
+- Refactor all detectors to use `ClassInspector` for parent class and naming convention checks
+- Simplify `Analyzer` by removing redundant delegation and streamlining detector orchestration
+- Clean up `DelegationParser` with leaner parsing logic
+- Improve `Base` detector with consolidated helper methods
+- Streamline reporter classes (`Base`, `Console`) for clarity and consistency
+
+### Removed
+
+- Remove duplicated class-matching code from `CallbackQuery`, `CountInIteration`, `CustomMethodQuery`, `DecoratorNPlusOne`, `DelegationNPlusOne`, `LoopAssociation`, and `SerializerNesting`
+
 ## [1.2.5] - 2026-02-21
 
 ### Added
