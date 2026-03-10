@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.6-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.7-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -42,7 +42,7 @@
 
 ## Features
 
-✨ **Detects 9 types of N+1 problems:**
+✨ **Detects 10 types of N+1 problems:**
 - Loop associations (queries in iterations)
 - Serializer nesting issues
 - Missing counter caches
@@ -52,6 +52,7 @@
 - Pluck to array misuse
 - Delegation N+1s (hidden via `delegate :method, to: :association`)
 - Decorator N+1s (Draper, SimpleDelegator, Presenter, ViewObject)
+- Scope chain N+1s (named scopes on associations in loops)
 
 🔧 **Developer-friendly:**
 - Inline suppression (like RuboCop)
@@ -398,6 +399,33 @@ Supports the following object references inside decorators:
 - `__getobj__` — SimpleDelegator standard
 - `source`, `model` — alternative Draper aliases
 
+### 10. Scope Chain N+1
+
+Detects named scope calls on associations inside iterations. Unlike explicit query methods (`.where`, `.find_by`) caught by `CustomMethodQuery`, named scopes (`.recent`, `.active`, `.published`) are invisible query triggers.
+
+```ruby
+# Model
+class Comment < ApplicationRecord
+  scope :recent, -> { where("created_at > ?", 1.week.ago) }
+  scope :approved, -> { where(approved: true) }
+end
+
+# Bad - scope call per iteration
+posts.each do |post|
+  post.comments.recent          # Query for each post!
+  post.comments.approved.count  # Query for each post!
+end
+
+# Good - preload and filter in Ruby
+posts.includes(:comments).each do |post|
+  post.comments.select { |c| c.created_at > 1.week.ago }
+end
+```
+
+EagerEye detects these by:
+1. Scanning model files for `scope :name, -> { ... }` declarations
+2. Flagging known scope names called on association chains inside iteration blocks
+
 ## Inline Suppression
 
 Suppress false positives using inline comments (RuboCop-style):
@@ -442,6 +470,7 @@ Both CamelCase and snake_case formats are accepted:
 | Pluck to Array | `PluckToArray` | `pluck_to_array` |
 | Delegation N+1 | `DelegationNPlusOne` | `delegation_n_plus_one` |
 | Decorator N+1 | `DecoratorNPlusOne` | `decorator_n_plus_one` |
+| Scope Chain N+1 | `ScopeChainNPlusOne` | `scope_chain_n_plus_one` |
 | All Detectors | `all` | `all` |
 
 ## Auto-fix (Experimental)
@@ -546,18 +575,20 @@ enabled_detectors:
   - pluck_to_array
   - delegation_n_plus_one
   - decorator_n_plus_one
+  - scope_chain_n_plus_one
 
 # Severity levels per detector (error, warning, info)
 severity_levels:
-  loop_association: error        # Definite N+1
+  loop_association: error          # Definite N+1
   serializer_nesting: warning
   custom_method_query: warning
   count_in_iteration: warning
   callback_query: warning
-  pluck_to_array: warning        # Optimization
-  delegation_n_plus_one: warning # Hidden delegation N+1
-  decorator_n_plus_one: warning  # Decorator/Presenter N+1
-  missing_counter_cache: info    # Suggestion
+  pluck_to_array: warning          # Optimization
+  delegation_n_plus_one: warning   # Hidden delegation N+1
+  decorator_n_plus_one: warning    # Decorator/Presenter N+1
+  scope_chain_n_plus_one: warning  # Scope chain on association
+  missing_counter_cache: info      # Suggestion
 
 # Minimum severity to report (default: info)
 min_severity: warning

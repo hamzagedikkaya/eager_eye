@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-03-10
+
+### Added
+
+- **New Detector: `ScopeChainNPlusOne`** - Detects scope calls on associations inside iterations
+  - Catches `post.comments.recent`, `post.comments.approved.count` patterns
+  - Parses model files for `scope :name, -> { ... }` declarations
+  - Flags known scope names called on association chains inside loops
+  - Each scope call executes a new query per iteration — suggests preloading or joined queries
+- **New Parser: `ScopeParser`** - Collects scope definitions from model files for cross-file detection
+
 ## [1.2.6] - 2026-02-25
 
 ### Changed

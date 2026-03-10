@@ -13,16 +13,18 @@ module EagerEye
       callback_query: Detectors::CallbackQuery,
       pluck_to_array: Detectors::PluckToArray,
       delegation_n_plus_one: Detectors::DelegationNPlusOne,
-      decorator_n_plus_one: Detectors::DecoratorNPlusOne
+      decorator_n_plus_one: Detectors::DecoratorNPlusOne,
+      scope_chain_n_plus_one: Detectors::ScopeChainNPlusOne
     }.freeze
 
-    attr_reader :paths, :issues, :association_preloads, :delegation_maps
+    attr_reader :paths, :issues, :association_preloads, :delegation_maps, :scope_maps
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
       @issues = []
       @association_preloads = {}
       @delegation_maps = {}
+      @scope_maps = {}
     end
 
     def run
@@ -48,6 +50,10 @@ module EagerEye
         deleg_parser = DelegationParser.new
         deleg_parser.parse_model(ast, model_name)
         @delegation_maps.merge!(deleg_parser.delegation_maps)
+
+        scope_parser = ScopeParser.new
+        scope_parser.parse_model(ast, model_name)
+        @scope_maps.merge!(scope_parser.scope_maps)
       rescue Errno::ENOENT, Errno::EACCES
         next
       end
@@ -108,6 +114,7 @@ module EagerEye
       args = [ast, file_path]
       args << @association_preloads if detector.is_a?(Detectors::LoopAssociation)
       args << @delegation_maps if detector.is_a?(Detectors::DelegationNPlusOne)
+      args << @scope_maps if detector.is_a?(Detectors::ScopeChainNPlusOne)
       args
     end
 

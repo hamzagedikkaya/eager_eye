@@ -9,6 +9,7 @@ module EagerEye
       loop_association serializer_nesting missing_counter_cache
       custom_method_query count_in_iteration callback_query
       pluck_to_array delegation_n_plus_one decorator_n_plus_one
+      scope_chain_n_plus_one
     ].freeze
 
     DEFAULT_SEVERITY_LEVELS = {
@@ -20,7 +21,8 @@ module EagerEye
       callback_query: :warning,
       pluck_to_array: :warning,
       delegation_n_plus_one: :warning,
-      decorator_n_plus_one: :warning
+      decorator_n_plus_one: :warning,
+      scope_chain_n_plus_one: :warning
     }.freeze
 
     VALID_SEVERITIES = %i[info warning error].freeze
