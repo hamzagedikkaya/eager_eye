@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.7-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.8-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -42,7 +42,7 @@
 
 ## Features
 
-✨ **Detects 10 types of N+1 problems:**
+✨ **Detects 11 types of N+1 problems:**
 - Loop associations (queries in iterations)
 - Serializer nesting issues
 - Missing counter caches
@@ -53,6 +53,7 @@
 - Delegation N+1s (hidden via `delegate :method, to: :association`)
 - Decorator N+1s (Draper, SimpleDelegator, Presenter, ViewObject)
 - Scope chain N+1s (named scopes on associations in loops)
+- Validation N+1s (uniqueness validation in batch create/save)
 
 🔧 **Developer-friendly:**
 - Inline suppression (like RuboCop)
@@ -426,6 +427,35 @@ EagerEye detects these by:
 1. Scanning model files for `scope :name, -> { ... }` declarations
 2. Flagging known scope names called on association chains inside iteration blocks
 
+### 11. Validation N+1
+
+Detects batch create/save operations inside iterations for models with `validates uniqueness`. Each uniqueness validation triggers a SELECT query per record, resulting in 2N queries (SELECT + INSERT per record).
+
+```ruby
+# Model
+class User < ApplicationRecord
+  validates :email, uniqueness: true
+end
+
+# Bad - 2N queries (SELECT + INSERT per record)
+params[:users].each do |user_params|
+  User.create!(user_params)          # SELECT + INSERT for each!
+end
+
+# Bad - same problem with new + save
+params[:users].each do |user_params|
+  user = User.new(user_params)
+  user.save!                         # SELECT + INSERT for each!
+end
+
+# Good - use insert_all with unique index
+User.insert_all(params[:users])      # Single bulk INSERT, DB enforces uniqueness
+```
+
+EagerEye detects these by:
+1. Scanning model files for `validates :attr, uniqueness: true` or `validates_uniqueness_of` declarations
+2. Flagging `Model.create/create!` or `Model.new` + `.save/.save!` patterns inside iteration blocks
+
 ## Inline Suppression
 
 Suppress false positives using inline comments (RuboCop-style):
@@ -471,6 +501,7 @@ Both CamelCase and snake_case formats are accepted:
 | Delegation N+1 | `DelegationNPlusOne` | `delegation_n_plus_one` |
 | Decorator N+1 | `DecoratorNPlusOne` | `decorator_n_plus_one` |
 | Scope Chain N+1 | `ScopeChainNPlusOne` | `scope_chain_n_plus_one` |
+| Validation N+1 | `ValidationNPlusOne` | `validation_n_plus_one` |
 | All Detectors | `all` | `all` |
 
 ## Auto-fix (Experimental)
@@ -576,19 +607,21 @@ enabled_detectors:
   - delegation_n_plus_one
   - decorator_n_plus_one
   - scope_chain_n_plus_one
+  - validation_n_plus_one
 
 # Severity levels per detector (error, warning, info)
 severity_levels:
-  loop_association: error          # Definite N+1
+  loop_association: error           # Definite N+1
   serializer_nesting: warning
   custom_method_query: warning
   count_in_iteration: warning
   callback_query: warning
-  pluck_to_array: warning          # Optimization
-  delegation_n_plus_one: warning   # Hidden delegation N+1
-  decorator_n_plus_one: warning    # Decorator/Presenter N+1
-  scope_chain_n_plus_one: warning  # Scope chain on association
-  missing_counter_cache: info      # Suggestion
+  pluck_to_array: warning           # Optimization
+  delegation_n_plus_one: warning    # Hidden delegation N+1
+  decorator_n_plus_one: warning     # Decorator/Presenter N+1
+  scope_chain_n_plus_one: warning   # Scope chain on association
+  validation_n_plus_one: warning    # Uniqueness validation in batch
+  missing_counter_cache: info       # Suggestion
 
 # Minimum severity to report (default: info)
 min_severity: warning

@@ -14,10 +14,11 @@ module EagerEye
       pluck_to_array: Detectors::PluckToArray,
       delegation_n_plus_one: Detectors::DelegationNPlusOne,
       decorator_n_plus_one: Detectors::DecoratorNPlusOne,
-      scope_chain_n_plus_one: Detectors::ScopeChainNPlusOne
+      scope_chain_n_plus_one: Detectors::ScopeChainNPlusOne,
+      validation_n_plus_one: Detectors::ValidationNPlusOne
     }.freeze
 
-    attr_reader :paths, :issues, :association_preloads, :delegation_maps, :scope_maps
+    attr_reader :paths, :issues, :association_preloads, :delegation_maps, :scope_maps, :uniqueness_models
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
@@ -25,6 +26,7 @@ module EagerEye
       @association_preloads = {}
       @delegation_maps = {}
       @scope_maps = {}
+      @uniqueness_models = Set.new
     end
 
     def run
@@ -54,6 +56,10 @@ module EagerEye
         scope_parser = ScopeParser.new
         scope_parser.parse_model(ast, model_name)
         @scope_maps.merge!(scope_parser.scope_maps)
+
+        validation_parser = ValidationParser.new
+        validation_parser.parse_model(ast, model_name)
+        @uniqueness_models.merge(validation_parser.uniqueness_models)
       rescue Errno::ENOENT, Errno::EACCES
         next
       end
@@ -115,6 +121,7 @@ module EagerEye
       args << @association_preloads if detector.is_a?(Detectors::LoopAssociation)
       args << @delegation_maps if detector.is_a?(Detectors::DelegationNPlusOne)
       args << @scope_maps if detector.is_a?(Detectors::ScopeChainNPlusOne)
+      args << @uniqueness_models if detector.is_a?(Detectors::ValidationNPlusOne)
       args
     end
 

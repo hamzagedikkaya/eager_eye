@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-03-10
+
+### Added
+
+- **New Detector: `ValidationNPlusOne`** - Detects batch create/save inside iterations for models with uniqueness validations
+  - Catches `User.create!(attrs)` and `User.new(attrs) + save!` patterns inside loops
+  - Parses model files for `validates :attr, uniqueness: true` and `validates_uniqueness_of` declarations
+  - Each uniqueness validation triggers a SELECT query per record — 2N queries total
+  - Suggests using `insert_all` with unique index constraints or batch-validating before saving
+- **New Parser: `ValidationParser`** - Collects models with uniqueness validations for cross-file detection
+
 ## [1.2.7] - 2026-03-10
 
 ### Added
