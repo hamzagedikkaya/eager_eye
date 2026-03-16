@@ -187,6 +187,36 @@ RSpec.describe EagerEye::AssociationParser do
       expect(parser.preloaded_associations).not_to have_key("User#profile")
     end
 
+    it "collects all association names" do
+      code = <<~RUBY
+        class User < ApplicationRecord
+          has_many :posts
+          has_one :profile
+          belongs_to :company
+          has_many :enrollments
+        end
+      RUBY
+
+      ast = Parser::CurrentRuby.parse(code)
+      parser.parse_model(ast, "User")
+
+      expect(parser.association_names).to include(:posts, :profile, :company, :enrollments)
+    end
+
+    it "collects association names even without preload scopes" do
+      code = <<~RUBY
+        class Order < ApplicationRecord
+          has_many :subscriptions
+        end
+      RUBY
+
+      ast = Parser::CurrentRuby.parse(code)
+      parser.parse_model(ast, "Order")
+
+      expect(parser.association_names).to include(:subscriptions)
+      expect(parser.preloaded_associations).to be_empty
+    end
+
     it "handles edge case with empty includes" do
       code = <<~RUBY
         class Post < ApplicationRecord

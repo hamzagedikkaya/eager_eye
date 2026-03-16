@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-03-13
+
+### Changed
+
+- **Dynamic Association Detection** - Association names are now automatically parsed from model files
+  - `has_many`, `has_one`, `belongs_to`, `has_and_belongs_to_many` declarations are collected
+  - Custom associations like `:enrollments`, `:subscriptions`, `:invoices` are now detected
+  - Dynamic names supplement (not replace) the hardcoded fallback lists
+  - Benefits `LoopAssociation`, `SerializerNesting`, `DecoratorNPlusOne`, and `MissingCounterCache`
+
 ## [1.2.8] - 2026-03-10
 
 ### Added

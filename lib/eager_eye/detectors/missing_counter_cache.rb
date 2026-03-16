@@ -17,9 +17,10 @@ module EagerEye
         :missing_counter_cache
       end
 
-      def detect(ast, file_path)
+      def detect(ast, file_path, association_names = Set.new)
         return [] unless ast
 
+        @dynamic_associations = association_names
         issues = []
 
         traverse_ast(ast) do |node|
@@ -51,7 +52,10 @@ module EagerEye
       end
 
       def likely_association_receiver?(node)
-        node.type == :send && PLURAL_ASSOCIATIONS.include?(node.children[1].to_s)
+        return false unless node.type == :send
+
+        method = node.children[1]
+        PLURAL_ASSOCIATIONS.include?(method.to_s) || @dynamic_associations&.include?(method)
       end
 
       def extract_association_name(node)

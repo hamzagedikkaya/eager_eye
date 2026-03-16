@@ -296,6 +296,37 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       end
     end
 
+    context "with dynamic association names" do
+      it "detects custom association from model parsing" do
+        source = <<~RUBY
+          class OrderSerializer
+            attribute :enrollment_data do
+              object.enrollments.map(&:name)
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb", Set[:enrollments])
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("enrollments")
+      end
+
+      it "does not detect custom association without dynamic names" do
+        source = <<~RUBY
+          class OrderSerializer
+            attribute :enrollment_data do
+              object.enrollments.map(&:name)
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
     context "with ActiveStorage attachments" do
       it "does not flag attached? calls" do
         source = <<~RUBY

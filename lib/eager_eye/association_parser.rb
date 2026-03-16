@@ -4,10 +4,11 @@ module EagerEye
   class AssociationParser
     ASSOCIATION_METHODS = %i[has_many has_one belongs_to has_and_belongs_to_many].freeze
 
-    attr_reader :preloaded_associations
+    attr_reader :preloaded_associations, :association_names
 
     def initialize
       @preloaded_associations = {}
+      @association_names = Set.new
     end
 
     def parse_model(ast, model_name)
@@ -34,6 +35,8 @@ module EagerEye
 
       association_name = extract_association_name(node)
       return unless association_name
+
+      @association_names << association_name
 
       preloaded = extract_preloaded_associations(node)
       return if preloaded.empty?

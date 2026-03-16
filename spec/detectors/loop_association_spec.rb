@@ -500,6 +500,33 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
       end
     end
 
+    context "with dynamic association names" do
+      it "detects custom association from model parsing" do
+        source = <<~RUBY
+          orders.each do |order|
+            order.enrollments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb", {}, Set[:enrollments])
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("order.enrollments")
+      end
+
+      it "does not detect custom association without dynamic names" do
+        source = <<~RUBY
+          orders.each do |order|
+            order.enrollments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
     context "with find_each iteration" do
       it "detects association call inside find_each block" do
         source = <<~RUBY

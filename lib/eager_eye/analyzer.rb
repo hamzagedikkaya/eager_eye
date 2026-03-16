@@ -18,12 +18,24 @@ module EagerEye
       validation_n_plus_one: Detectors::ValidationNPlusOne
     }.freeze
 
-    attr_reader :paths, :issues, :association_preloads, :delegation_maps, :scope_maps, :uniqueness_models
+    DETECTOR_EXTRA_ARGS = {
+      Detectors::LoopAssociation => %i[association_preloads association_names],
+      Detectors::SerializerNesting => %i[association_names],
+      Detectors::MissingCounterCache => %i[association_names],
+      Detectors::DecoratorNPlusOne => %i[association_names],
+      Detectors::DelegationNPlusOne => %i[delegation_maps],
+      Detectors::ScopeChainNPlusOne => %i[scope_maps],
+      Detectors::ValidationNPlusOne => %i[uniqueness_models]
+    }.freeze
+
+    attr_reader :paths, :issues, :association_preloads, :association_names, :delegation_maps, :scope_maps,
+                :uniqueness_models
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
       @issues = []
       @association_preloads = {}
+      @association_names = Set.new
       @delegation_maps = {}
       @scope_maps = {}
       @uniqueness_models = Set.new
@@ -48,6 +60,7 @@ module EagerEye
         assoc_parser = AssociationParser.new
         assoc_parser.parse_model(ast, model_name)
         @association_preloads.merge!(assoc_parser.preloaded_associations)
+        @association_names.merge(assoc_parser.association_names)
 
         deleg_parser = DelegationParser.new
         deleg_parser.parse_model(ast, model_name)
@@ -117,12 +130,8 @@ module EagerEye
     end
 
     def detector_args(detector, ast, file_path)
-      args = [ast, file_path]
-      args << @association_preloads if detector.is_a?(Detectors::LoopAssociation)
-      args << @delegation_maps if detector.is_a?(Detectors::DelegationNPlusOne)
-      args << @scope_maps if detector.is_a?(Detectors::ScopeChainNPlusOne)
-      args << @uniqueness_models if detector.is_a?(Detectors::ValidationNPlusOne)
-      args
+      extra = DETECTOR_EXTRA_ARGS.find { |klass, _| detector.is_a?(klass) }&.last || []
+      [ast, file_path, *extra.map { |name| instance_variable_get(:"@#{name}") }]
     end
 
     def enabled_detectors

@@ -30,11 +30,12 @@ module EagerEye
         :loop_association
       end
 
-      def detect(ast, file_path, association_preloads = {})
+      def detect(ast, file_path, association_preloads = {}, association_names = Set.new)
         return [] unless ast
 
         issues = []
         @association_preloads = association_preloads
+        @dynamic_associations = association_names
         build_variable_maps(ast)
 
         traverse_ast(ast) do |node|
@@ -181,8 +182,12 @@ module EagerEye
 
       def excluded_method?(method, included)
         EXCLUDED_METHODS.include?(method) ||
-          !ASSOCIATION_NAMES.include?(method.to_s) ||
+          !known_association?(method) ||
           included.include?(method)
+      end
+
+      def known_association?(method)
+        ASSOCIATION_NAMES.include?(method.to_s) || @dynamic_associations.include?(method)
       end
     end
   end

@@ -15,9 +15,10 @@ module EagerEye
         :serializer_nesting
       end
 
-      def detect(ast, file_path)
+      def detect(ast, file_path, association_names = Set.new)
         return [] unless ast
 
+        @dynamic_associations = association_names
         issues = []
         traverse_ast(ast) do |node|
           next unless node.type == :class && serializer_class?(node)

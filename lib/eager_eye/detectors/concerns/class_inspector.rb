@@ -35,7 +35,7 @@ module EagerEye
         end
 
         def likely_association?(method_name)
-          HAS_MANY_ASSOCIATIONS.include?(method_name.to_s)
+          HAS_MANY_ASSOCIATIONS.include?(method_name.to_s) || @dynamic_associations&.include?(method_name)
         end
 
         def collect_active_storage_lines(body)
