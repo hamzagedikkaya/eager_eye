@@ -19,23 +19,25 @@ module EagerEye
     }.freeze
 
     DETECTOR_EXTRA_ARGS = {
-      Detectors::LoopAssociation => %i[association_preloads association_names],
-      Detectors::SerializerNesting => %i[association_names],
+      Detectors::LoopAssociation => %i[association_preloads association_names method_queries],
+      Detectors::SerializerNesting => %i[association_names method_queries],
       Detectors::MissingCounterCache => %i[association_names],
-      Detectors::DecoratorNPlusOne => %i[association_names],
+      Detectors::DecoratorNPlusOne => %i[association_names method_queries],
+      Detectors::CustomMethodQuery => %i[method_queries],
       Detectors::DelegationNPlusOne => %i[delegation_maps],
       Detectors::ScopeChainNPlusOne => %i[scope_maps],
       Detectors::ValidationNPlusOne => %i[uniqueness_models]
     }.freeze
 
-    attr_reader :paths, :issues, :association_preloads, :association_names, :delegation_maps, :scope_maps,
-                :uniqueness_models
+    attr_reader :paths, :issues, :association_preloads, :association_names, :method_queries, :delegation_maps,
+                :scope_maps, :uniqueness_models
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
       @issues = []
       @association_preloads = {}
       @association_names = Set.new
+      @method_queries = {}
       @delegation_maps = {}
       @scope_maps = {}
       @uniqueness_models = Set.new
@@ -73,6 +75,10 @@ module EagerEye
         validation_parser = ValidationParser.new
         validation_parser.parse_model(ast, model_name)
         @uniqueness_models.merge(validation_parser.uniqueness_models)
+
+        method_query_parser = MethodQueryParser.new
+        method_query_parser.parse_model(ast, model_name)
+        @method_queries.merge!(method_query_parser.method_queries)
       rescue Errno::ENOENT, Errno::EACCES
         next
       end

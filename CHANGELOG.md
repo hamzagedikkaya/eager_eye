@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.10] - 2026-03-16
+
+### Added
+
+- **Cross-File Analysis** - Model methods containing queries are now detected when called from other files
+  - New `MethodQueryParser` scans model files for methods that execute queries (`.where`, `.find_by`, `.count`, `.pluck`, etc.)
+  - `LoopAssociation` detects cross-file query methods called inside loops (e.g. `user.active_orders` in a controller)
+  - `CustomMethodQuery` detects model query methods called inside iterations
+  - `SerializerNesting` detects model query methods called in serializer attribute blocks
+  - `DecoratorNPlusOne` detects model query methods called in decorator methods
+  - Two-pass architecture: first pass collects method signatures, second pass detects cross-file N+1 patterns
+
 ## [1.2.9] - 2026-03-13
 
 ### Changed

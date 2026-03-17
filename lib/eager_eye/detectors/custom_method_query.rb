@@ -15,14 +15,16 @@ module EagerEye
         :custom_method_query
       end
 
-      def detect(ast, file_path)
+      def detect(ast, file_path, method_queries = {})
         return [] unless ast
 
         @issues = []
         @file_path = file_path
+        @method_queries = method_queries
 
         find_iteration_blocks(ast) do |block_body, block_var, collection, definitions|
           check_block_for_query_methods(block_body, block_var, collection_is_array?(collection, definitions))
+          check_block_for_model_query_methods(block_body, block_var)
         end
 
         @issues
@@ -110,6 +112,31 @@ module EagerEye
 
       def receiver_is_query_chain?(node)
         node.is_a?(Parser::AST::Node) && node.type == :send && QUERY_METHODS.include?(node.children[1])
+      end
+
+      def check_block_for_model_query_methods(node, block_var)
+        return unless node.is_a?(Parser::AST::Node)
+
+        if model_query_call?(node, block_var)
+          method = node.children[1]
+          @issues << create_issue(
+            file_path: @file_path,
+            line_number: node.loc.line,
+            message: "Model method `.#{method}` contains a query and is called inside iteration",
+            suggestion: "This method executes a query on each iteration. Preload data or move the query outside."
+          )
+        end
+        node.children.each { |child| check_block_for_model_query_methods(child, block_var) }
+      end
+
+      def model_query_call?(node, block_var)
+        return false unless node.type == :send
+
+        receiver = node.children[0]
+        method = node.children[1]
+        return false unless receiver&.type == :lvar && receiver.children[0] == block_var
+
+        @method_queries&.any? { |_model, methods| methods.include?(method) }
       end
 
       def add_issue(node)

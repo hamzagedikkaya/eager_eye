@@ -15,10 +15,11 @@ module EagerEye
         :serializer_nesting
       end
 
-      def detect(ast, file_path, association_names = Set.new)
+      def detect(ast, file_path, association_names = Set.new, method_queries = {})
         return [] unless ast
 
         @dynamic_associations = association_names
+        @method_queries = method_queries
         issues = []
         traverse_ast(ast) do |node|
           next unless node.type == :class && serializer_class?(node)
@@ -86,14 +87,23 @@ module EagerEye
 
           receiver = node.children[0]
           method_name = node.children[1]
-          next unless object_reference?(receiver) && likely_association?(method_name)
+          next unless object_reference?(receiver)
 
-          issues << create_issue(
-            file_path: file_path,
-            line_number: node.loc.line,
-            message: "Nested association `#{receiver_name(receiver)}.#{method_name}` in serializer attribute",
-            suggestion: "Eager load :#{method_name} in controller or use association serializer"
-          )
+          if likely_association?(method_name)
+            issues << create_issue(
+              file_path: file_path,
+              line_number: node.loc.line,
+              message: "Nested association `#{receiver_name(receiver)}.#{method_name}` in serializer attribute",
+              suggestion: "Eager load :#{method_name} in controller or use association serializer"
+            )
+          elsif model_query_method?(method_name)
+            issues << create_issue(
+              file_path: file_path,
+              line_number: node.loc.line,
+              message: "Model method `#{receiver_name(receiver)}.#{method_name}` contains a query in serializer",
+              suggestion: "This method executes a query per serialized object. Preload or cache the data."
+            )
+          end
         end
       end
 
@@ -113,6 +123,10 @@ module EagerEye
         when :lvar then node.children[0].to_s
         else "object"
         end
+      end
+
+      def model_query_method?(method_name)
+        @method_queries&.any? { |_model, methods| methods.include?(method_name) }
       end
     end
   end

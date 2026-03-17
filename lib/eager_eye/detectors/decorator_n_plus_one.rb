@@ -14,10 +14,11 @@ module EagerEye
         :decorator_n_plus_one
       end
 
-      def detect(ast, file_path, association_names = Set.new)
+      def detect(ast, file_path, association_names = Set.new, method_queries = {})
         return [] unless ast
 
         @dynamic_associations = association_names
+        @method_queries = method_queries
         issues = []
         traverse_ast(ast) do |node|
           next unless node.type == :class && decorator_class?(node)
@@ -65,20 +66,33 @@ module EagerEye
 
           receiver = node.children[0]
           method_name = node.children[1]
-          next unless object_reference?(receiver) && likely_association?(method_name)
+          next unless object_reference?(receiver)
 
           ref = receiver.children[1]
-          issues << create_issue(
-            file_path: file_path,
-            line_number: node.loc.line,
-            message: "N+1 in decorator: `#{ref}.#{method_name}` loads association on each decorated object",
-            suggestion: "Eager load :#{method_name} in the controller before decorating the collection"
-          )
+          if likely_association?(method_name)
+            issues << create_issue(
+              file_path: file_path,
+              line_number: node.loc.line,
+              message: "N+1 in decorator: `#{ref}.#{method_name}` loads association on each decorated object",
+              suggestion: "Eager load :#{method_name} in the controller before decorating the collection"
+            )
+          elsif model_query_method?(method_name)
+            issues << create_issue(
+              file_path: file_path,
+              line_number: node.loc.line,
+              message: "N+1 in decorator: `#{ref}.#{method_name}` calls a query method defined in the model",
+              suggestion: "Preload the data in the controller before decorating the collection"
+            )
+          end
         end
       end
 
       def object_reference?(node)
         node&.type == :send && node.children[0].nil? && OBJECT_REFS.include?(node.children[1])
+      end
+
+      def model_query_method?(method_name)
+        @method_queries&.any? { |_model, methods| methods.include?(method_name) }
       end
     end
   end

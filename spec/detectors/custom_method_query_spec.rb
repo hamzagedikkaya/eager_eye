@@ -506,5 +506,79 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues.first.message).to include(".where")
       end
     end
+
+    context "with cross-file method queries" do
+      it "detects model query method called inside iteration" do
+        source = <<~RUBY
+          @users.each do |user|
+            user.active_orders
+          end
+        RUBY
+
+        method_queries = { "User" => Set[:active_orders] }
+        issues = detector.detect(parse(source), "test.rb", method_queries)
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".active_orders")
+        expect(issues.first.message).to include("contains a query")
+      end
+
+      it "does not detect model query method without method_queries data" do
+        source = <<~RUBY
+          @users.each do |user|
+            user.active_orders
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "detects cross-file query method alongside inline query" do
+        source = <<~RUBY
+          @posts.each do |post|
+            post.comments.where(approved: true)
+            post.cached_comment_count
+          end
+        RUBY
+
+        method_queries = { "Post" => Set[:cached_comment_count] }
+        issues = detector.detect(parse(source), "test.rb", method_queries)
+
+        expect(issues.size).to eq(2)
+        messages = issues.map(&:message)
+        expect(messages).to include(a_string_including(".where"))
+        expect(messages).to include(a_string_including(".cached_comment_count"))
+      end
+
+      it "detects cross-file query method in map block" do
+        source = <<~RUBY
+          @orders.map do |order|
+            order.total_amount
+          end
+        RUBY
+
+        method_queries = { "Order" => Set[:total_amount] }
+        issues = detector.detect(parse(source), "test.rb", method_queries)
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".total_amount")
+      end
+
+      it "does not detect when method is not on block variable" do
+        source = <<~RUBY
+          other = Post.first
+          @posts.each do |post|
+            other.expensive_calc
+          end
+        RUBY
+
+        method_queries = { "Post" => Set[:expensive_calc] }
+        issues = detector.detect(parse(source), "test.rb", method_queries)
+
+        expect(issues).to be_empty
+      end
+    end
   end
 end

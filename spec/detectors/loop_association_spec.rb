@@ -527,6 +527,79 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
       end
     end
 
+    context "with cross-file method queries" do
+      it "detects model query method called inside loop" do
+        source = <<~RUBY
+          users.each do |user|
+            user.active_orders
+          end
+        RUBY
+
+        method_queries = { "User" => Set[:active_orders] }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, method_queries)
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("user.active_orders")
+        expect(issues.first.message).to include("query method defined in the model")
+      end
+
+      it "does not detect model query method without method_queries data" do
+        source = <<~RUBY
+          users.each do |user|
+            user.active_orders
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "detects multiple cross-file query methods in same loop" do
+        source = <<~RUBY
+          posts.each do |post|
+            post.recent_comments
+            post.top_rated_comment
+          end
+        RUBY
+
+        method_queries = { "Post" => Set[:recent_comments, :top_rated_comment] }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, method_queries)
+
+        expect(issues.size).to eq(2)
+      end
+
+      it "does not flag excluded methods even if in method_queries" do
+        source = <<~RUBY
+          users.each do |user|
+            user.name
+          end
+        RUBY
+
+        method_queries = { "User" => Set[:name] }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, method_queries)
+
+        expect(issues).to be_empty
+      end
+
+      it "detects both association and method query issues in same loop" do
+        source = <<~RUBY
+          posts.each do |post|
+            post.author
+            post.expensive_calculation
+          end
+        RUBY
+
+        method_queries = { "Post" => Set[:expensive_calculation] }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, method_queries)
+
+        expect(issues.size).to eq(2)
+        messages = issues.map(&:message)
+        expect(messages).to include(a_string_including("post.author"))
+        expect(messages).to include(a_string_including("post.expensive_calculation"))
+      end
+    end
+
     context "with find_each iteration" do
       it "detects association call inside find_each block" do
         source = <<~RUBY

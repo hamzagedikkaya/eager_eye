@@ -300,6 +300,61 @@ RSpec.describe EagerEye::Detectors::DecoratorNPlusOne do
       end
     end
 
+    context "with cross-file method queries" do
+      it "detects model query method in decorator" do
+        source = <<~RUBY
+          class PostDecorator < Draper::Decorator
+            def comment_summary
+              object.cached_comment_count
+            end
+          end
+        RUBY
+
+        method_queries = { "Post" => Set[:cached_comment_count] }
+        issues = detector.detect(parse(source), "test.rb", Set.new, method_queries)
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("cached_comment_count")
+        expect(issues.first.message).to include("query method defined in the model")
+      end
+
+      it "does not detect model query method without method_queries data" do
+        source = <<~RUBY
+          class PostDecorator < Draper::Decorator
+            def comment_summary
+              object.cached_comment_count
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "detects both association and model query method" do
+        source = <<~RUBY
+          class OrderDecorator < Draper::Decorator
+            def details
+              object.items.map(&:name)
+            end
+
+            def total
+              object.compute_total
+            end
+          end
+        RUBY
+
+        method_queries = { "Order" => Set[:compute_total] }
+        issues = detector.detect(parse(source), "test.rb", Set.new, method_queries)
+
+        expect(issues.size).to eq(2)
+        messages = issues.map(&:message)
+        expect(messages).to include(a_string_including("items"))
+        expect(messages).to include(a_string_including("compute_total"))
+      end
+    end
+
     context "with fixture files" do
       let(:fixtures_path) { File.expand_path("../fixtures", __dir__) }
 

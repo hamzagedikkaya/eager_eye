@@ -30,12 +30,13 @@ module EagerEye
         :loop_association
       end
 
-      def detect(ast, file_path, association_preloads = {}, association_names = Set.new)
+      def detect(ast, file_path, association_preloads = {}, association_names = Set.new, method_queries = {})
         return [] unless ast
 
         issues = []
         @association_preloads = association_preloads
         @dynamic_associations = association_names
+        @method_queries = method_queries
         build_variable_maps(ast)
 
         traverse_ast(ast) do |node|
@@ -157,15 +158,23 @@ module EagerEye
       def find_association_calls(node, block_var, file_path, issues, included_associations = Set.new)
         reported = Set.new
         traverse_ast(node) do |child|
-          next unless reportable_association_call?(child, block_var, reported, included_associations)
-
-          method = child.children[1]
-          issues << create_issue(
-            file_path: file_path,
-            line_number: child.loc.line,
-            message: "Potential N+1 query: `#{block_var}.#{method}` called inside loop",
-            suggestion: "Use `includes(:#{method})` before iterating"
-          )
+          if reportable_association_call?(child, block_var, reported, included_associations)
+            method = child.children[1]
+            issues << create_issue(
+              file_path: file_path,
+              line_number: child.loc.line,
+              message: "Potential N+1 query: `#{block_var}.#{method}` called inside loop",
+              suggestion: "Use `includes(:#{method})` before iterating"
+            )
+          elsif reportable_method_query_call?(child, block_var, reported)
+            method = child.children[1]
+            issues << create_issue(
+              file_path: file_path,
+              line_number: child.loc.line,
+              message: "Potential N+1 query: `#{block_var}.#{method}` calls a query method defined in the model",
+              suggestion: "Preload the data or restructure to avoid per-record queries"
+            )
+          end
         end
       end
 
@@ -188,6 +197,18 @@ module EagerEye
 
       def known_association?(method)
         ASSOCIATION_NAMES.include?(method.to_s) || @dynamic_associations.include?(method)
+      end
+
+      def reportable_method_query_call?(node, block_var, reported)
+        return false unless block_var_send?(node, block_var)
+        return false if EXCLUDED_METHODS.include?(node.children[1])
+        return false unless @method_queries&.any? { |_, ms| ms.include?(node.children[1]) }
+
+        reported.add?("#{node.loc.line}:#{node.children[1]}")
+      end
+
+      def block_var_send?(node, block_var)
+        node.type == :send && node.children[0]&.type == :lvar && node.children[0].children[0] == block_var
       end
     end
   end

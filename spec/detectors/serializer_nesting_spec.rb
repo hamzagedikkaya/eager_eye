@@ -327,6 +327,58 @@ RSpec.describe EagerEye::Detectors::SerializerNesting do
       end
     end
 
+    context "with cross-file method queries" do
+      it "detects model query method in serializer attribute block" do
+        source = <<~RUBY
+          class PostSerializer
+            attribute :comment_summary do
+              object.cached_comment_count
+            end
+          end
+        RUBY
+
+        method_queries = { "Post" => Set[:cached_comment_count] }
+        issues = detector.detect(parse(source), "test.rb", Set.new, method_queries)
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("cached_comment_count")
+        expect(issues.first.message).to include("contains a query")
+      end
+
+      it "does not detect model query method without method_queries data" do
+        source = <<~RUBY
+          class PostSerializer
+            attribute :comment_summary do
+              object.cached_comment_count
+            end
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+
+      it "detects both association and model query method" do
+        source = <<~RUBY
+          class OrderSerializer
+            attribute :details do
+              object.items.map(&:name)
+              object.total_amount
+            end
+          end
+        RUBY
+
+        method_queries = { "Order" => Set[:total_amount] }
+        issues = detector.detect(parse(source), "test.rb", Set.new, method_queries)
+
+        expect(issues.size).to eq(2)
+        messages = issues.map(&:message)
+        expect(messages).to include(a_string_including("items"))
+        expect(messages).to include(a_string_including("total_amount"))
+      end
+    end
+
     context "with ActiveStorage attachments" do
       it "does not flag attached? calls" do
         source = <<~RUBY
