@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.11] - 2026-03-17
+
+### Added
+
+- **`each_with_object` / `reduce` / `inject` Support** - `LoopAssociation` and `CustomMethodQuery` detectors now recognize these iteration methods
+  - `each_with_object` and `each_with_index` blocks are detected (item is first param)
+  - `reduce` and `inject` blocks are detected with correct variable extraction (item is second param: `|memo, item|`)
+  - `extract_iteration_variable` helper added to `Base` for reuse across detectors
+
 ## [1.2.10] - 2026-03-16
 
 ### Added

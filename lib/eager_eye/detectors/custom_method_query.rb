@@ -9,6 +9,7 @@ module EagerEye
       SAFE_TRANSFORM_METHODS = %i[keys values split [] params sort pluck ids to_s to_a to_i chars bytes].freeze
       ARRAY_COLUMN_SUFFIXES = %w[_ids _tags _types _codes _names _values _arr].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map
+                             each_with_index each_with_object reduce inject
                              find_each find_in_batches in_batches].freeze
 
       def self.detector_name
@@ -38,7 +39,7 @@ module EagerEye
         definitions[node.children[0]] = node.children[1] if node.type == :lvasgn
 
         if iteration_block?(node)
-          block_var = extract_block_variable(node)
+          block_var = extract_iteration_variable(node)
           block_body = node.children[2]
           yield(block_body, block_var, node.children[0], definitions) if block_var && block_body
         end

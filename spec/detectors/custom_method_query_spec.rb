@@ -492,6 +492,63 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
       end
     end
 
+    context "with each_with_object iteration" do
+      it "detects query method inside each_with_object block" do
+        source = <<~RUBY
+          @users.each_with_object({}) do |user, hash|
+            hash[user.id] = user.teams.where(active: true)
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".where")
+      end
+    end
+
+    context "with reduce iteration" do
+      it "detects query method inside reduce block (item is second param)" do
+        source = <<~RUBY
+          @users.reduce([]) do |result, user|
+            result + user.orders.where(active: true).to_a
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".where")
+      end
+
+      it "does not flag accumulator variable as item" do
+        source = <<~RUBY
+          @users.reduce(0) do |count, user|
+            count + 1
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with inject iteration" do
+      it "detects query method inside inject block" do
+        source = <<~RUBY
+          @orders.inject({}) do |memo, order|
+            memo.merge(order.id => order.line_items.pluck(:name))
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".pluck")
+      end
+    end
+
     context "with find_each iteration" do
       it "detects query method inside find_each block" do
         source = <<~RUBY

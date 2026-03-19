@@ -600,6 +600,64 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
       end
     end
 
+    context "with each_with_object iteration" do
+      it "detects association call inside each_with_object block" do
+        source = <<~RUBY
+          posts.each_with_object({}) do |post, hash|
+            hash[post.id] = post.author.name
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.author")
+      end
+    end
+
+    context "with reduce iteration" do
+      it "detects association call inside reduce block" do
+        source = <<~RUBY
+          posts.reduce([]) do |result, post|
+            result << post.comments.map(&:body)
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.comments")
+      end
+
+      it "does not confuse accumulator with item variable" do
+        source = <<~RUBY
+          posts.reduce({}) do |memo, post|
+            memo.merge(post.author.name => true)
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.author")
+      end
+    end
+
+    context "with inject iteration" do
+      it "detects association call inside inject block" do
+        source = <<~RUBY
+          users.inject([]) do |acc, user|
+            acc + user.posts.to_a
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("user.posts")
+      end
+    end
+
     context "with find_each iteration" do
       it "detects association call inside find_each block" do
         source = <<~RUBY

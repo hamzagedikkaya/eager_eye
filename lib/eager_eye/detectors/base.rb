@@ -73,10 +73,22 @@ module EagerEye
         end
       end
 
+      ACCUMULATOR_FIRST_METHODS = %i[reduce inject].freeze
+
       def extract_block_variable(block_node)
         args = block_node&.children&.[](1)
         first_arg = args&.children&.first
         first_arg&.type == :arg ? first_arg.children[0] : nil
+      end
+
+      def extract_iteration_variable(block_node)
+        idx = accumulator_first?(block_node) ? 1 : 0
+        arg = block_node.children[1]&.children&.[](idx)
+        arg&.type == :arg ? arg.children[0] : nil
+      end
+
+      def accumulator_first?(block_node)
+        ACCUMULATOR_FIRST_METHODS.include?(block_node.children[0]&.children&.[](1))
       end
 
       def receiver_chain_starts_with?(node, target_var)
