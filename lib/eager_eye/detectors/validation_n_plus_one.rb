@@ -4,7 +4,7 @@ module EagerEye
   module Detectors
     class ValidationNPlusOne < Base
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map
-                             find_each find_in_batches in_batches].freeze
+                             find_each find_in_batches in_batches array!].freeze
       CREATE_METHODS = %i[create create!].freeze
       SAVE_METHODS = %i[save save!].freeze
 

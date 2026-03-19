@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.12] - 2026-03-20
+
+### Added
+
+- **`.jbuilder` File Support** - Analyzer now scans `.jbuilder` files for N+1 queries
+  - `json.array!` blocks are recognized as iteration patterns across all detectors
+  - Existing detectors (LoopAssociation, CountInIteration, etc.) work seamlessly on jbuilder views
+- **`CountToSize` Auto-fix** - Automatically replaces `.count` with `.size` inside iteration blocks
+- **`AddIncludes` Auto-fix** - Suggests and applies `.includes(:association)` before iteration calls
+
 ## [1.2.11] - 2026-03-17
 
 ### Added

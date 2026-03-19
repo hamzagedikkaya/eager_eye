@@ -700,5 +700,33 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
         expect(issues.size).to eq(1)
       end
     end
+
+    context "with jbuilder json.array! iteration" do
+      it "detects N+1 inside json.array! block" do
+        source = <<~RUBY
+          json.array! @posts do |post|
+            post.comments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "index.json.jbuilder")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.comments")
+      end
+
+      it "detects chained association in json.array!" do
+        source = <<~RUBY
+          json.array! @posts do |post|
+            post.author
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "index.json.jbuilder")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.author")
+      end
+    end
   end
 end

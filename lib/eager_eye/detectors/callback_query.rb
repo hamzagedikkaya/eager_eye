@@ -27,7 +27,7 @@ module EagerEye
       ].freeze
 
       ITERATION_METHODS = %i[each map select find_all reject collect
-                             find_each find_in_batches in_batches].freeze
+                             find_each find_in_batches in_batches array!].freeze
       AR_BATCH_METHODS = %i[find_each find_in_batches in_batches].freeze
       NON_AR_NAMESPACES = %w[Sidekiq Redis ActionCable ActionMailer Kafka].freeze
       TRANSACTIONAL_CALLBACKS = %i[before_validation before_save before_create before_update before_destroy

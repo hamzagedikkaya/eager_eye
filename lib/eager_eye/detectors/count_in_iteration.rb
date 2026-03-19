@@ -5,7 +5,7 @@ module EagerEye
     class CountInIteration < Base
       COUNT_METHODS = %i[count].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect each_with_index each_with_object flat_map
-                             find_each find_in_batches in_batches].freeze
+                             find_each find_in_batches in_batches array!].freeze
       ARRAY_METHOD_SUFFIXES = %w[_ids _tags _types _codes _names _values].freeze
 
       def self.detector_name

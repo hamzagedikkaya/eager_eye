@@ -10,7 +10,7 @@ module EagerEye
       ARRAY_COLUMN_SUFFIXES = %w[_ids _tags _types _codes _names _values _arr].freeze
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map
                              each_with_index each_with_object reduce inject
-                             find_each find_in_batches in_batches].freeze
+                             find_each find_in_batches in_batches array!].freeze
 
       def self.detector_name
         :custom_method_query

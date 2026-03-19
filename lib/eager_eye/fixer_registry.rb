@@ -3,7 +3,9 @@
 module EagerEye
   class FixerRegistry
     FIXERS = {
-      pluck_to_array: Fixers::PluckToSelect
+      pluck_to_array: Fixers::PluckToSelect,
+      count_in_iteration: Fixers::CountToSize,
+      loop_association: Fixers::AddIncludes
     }.freeze
 
     def self.fixer_for(issue, source_code)

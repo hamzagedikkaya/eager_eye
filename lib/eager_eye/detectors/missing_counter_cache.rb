@@ -11,7 +11,7 @@ module EagerEye
       ].freeze
       ITERATION_METHODS = %i[each map collect select reject find_all filter filter_map flat_map
                              each_with_index each_with_object reduce inject sum
-                             find_each find_in_batches in_batches].freeze
+                             find_each find_in_batches in_batches array!].freeze
 
       def self.detector_name
         :missing_counter_cache

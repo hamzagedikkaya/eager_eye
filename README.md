@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml"><img src="https://github.com/hamzagedikkaya/eager_eye/actions/workflows/main.yml/badge.svg" alt="CI"></a>
-  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.11-red.svg" alt="Gem Version"></a>
+  <a href="https://rubygems.org/gems/eager_eye"><img src="https://img.shields.io/badge/gem-v1.2.12-red.svg" alt="Gem Version"></a>
   <a href="https://github.com/hamzagedikkaya/eager_eye"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage"></a>
   <a href="https://www.ruby-lang.org/"><img src="https://img.shields.io/badge/ruby-%3E%3D%203.1-ruby.svg" alt="Ruby"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
@@ -57,7 +57,8 @@
 
 🔧 **Developer-friendly:**
 - Inline suppression (like RuboCop)
-- Auto-fix support (experimental)
+- Auto-fix support (3 fixers: PluckToSelect, CountToSize, AddIncludes)
+- `.jbuilder` file support (`json.array!` iteration detection)
 - JSON/Console output formats
 - RSpec integration
 
@@ -524,6 +525,8 @@ eager_eye --fix --force
 | Issue | Fix |
 |-------|-----|
 | `.pluck(:id)` inline | → `.select(:id)` |
+| `.count` in iteration | → `.size` |
+| Missing `includes` before loop | → `.includes(:assoc)` inserted |
 
 ### Example
 
@@ -534,6 +537,15 @@ app/services/user_service.rb:
   Line 12:
     - Post.where(user_id: User.active.pluck(:id))
     + Post.where(user_id: User.active.select(:id))
+
+app/controllers/posts_controller.rb:
+  Line 8:
+    - user.posts.count
+    + user.posts.size
+
+  Line 5:
+    - @posts.each do |post|
+    + @posts.includes(:author).each do |post|
 
 $ eager_eye --fix
 app/services/user_service.rb:12
@@ -739,7 +751,7 @@ EagerEye uses static analysis, which means:
 - **No runtime context** - Cannot know if associations are already eager loaded elsewhere
 - **Heuristic-based** - Uses naming conventions to identify associations (may have false positives)
 - **Ruby code only** - Does not analyze SQL queries or ActiveRecord internals
-- **Cross-file scope** - Cross-file analysis is limited to model-defined methods; controller-to-view or service-to-service patterns are not yet tracked
+- **Cross-file scope** - Cross-file analysis covers model-defined query methods; controller-to-view or service-to-service patterns are not yet tracked
 
 For best results, use EagerEye alongside runtime tools like Bullet for comprehensive N+1 detection.
 

@@ -5,7 +5,7 @@ module EagerEye
     class DelegationNPlusOne < Base
       ITERATION_METHODS = %i[
         each map collect select find_all reject filter filter_map flat_map
-        find_each find_in_batches in_batches
+        find_each find_in_batches in_batches array!
       ].freeze
       PRELOAD_METHODS = %i[includes preload eager_load].freeze
 

@@ -99,7 +99,7 @@ module EagerEye
 
     def resolve_path(path)
       return [path] if File.file?(path)
-      return Dir.glob(File.join(path, "**", "*.rb")) if File.directory?(path)
+      return Dir.glob(File.join(path, "**", "*.{rb,jbuilder}")) if File.directory?(path)
 
       Dir.glob(path)
     end

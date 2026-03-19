@@ -329,5 +329,21 @@ RSpec.describe EagerEye::Detectors::CountInIteration do
         expect(issues.first.message).to include(".count")
       end
     end
+
+    context "with jbuilder json.array! iteration" do
+      it "detects .count inside json.array! block" do
+        source = <<~RUBY
+          json.array! @posts do |post|
+            post.comments.count
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "index.json.jbuilder")
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".count")
+        expect(issues.first.suggestion).to include(".size")
+      end
+    end
   end
 end

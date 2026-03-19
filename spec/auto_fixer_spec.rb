@@ -178,6 +178,129 @@ RSpec.describe EagerEye::Fixers::PluckToSelect do
   end
 end
 
+RSpec.describe EagerEye::Fixers::CountToSize do
+  describe "#fixable?" do
+    it "returns true for count_in_iteration issue with .count on line" do
+      issue = EagerEye::Issue.new(
+        detector: :count_in_iteration,
+        file_path: "test.rb",
+        line_number: 2,
+        message: "test",
+        severity: :warning
+      )
+      source = "@users.each do |user|\n  user.posts.count\nend\n"
+
+      fixer = described_class.new(issue, source)
+      expect(fixer.fixable?).to be true
+    end
+
+    it "returns false for non count_in_iteration detector" do
+      issue = EagerEye::Issue.new(
+        detector: :loop_association,
+        file_path: "test.rb",
+        line_number: 1,
+        message: "test",
+        severity: :warning
+      )
+      source = "user.posts.count\n"
+
+      fixer = described_class.new(issue, source)
+      expect(fixer.fixable?).to be false
+    end
+  end
+
+  describe "#diff" do
+    it "replaces .count with .size" do
+      issue = EagerEye::Issue.new(
+        detector: :count_in_iteration,
+        file_path: "test.rb",
+        line_number: 2,
+        message: "test",
+        severity: :warning
+      )
+      source = "@users.each do |user|\n  user.posts.count\nend\n"
+
+      fixer = described_class.new(issue, source)
+      diff = fixer.diff
+
+      expect(diff[:original]).to eq("  user.posts.count")
+      expect(diff[:fixed]).to eq("  user.posts.size")
+    end
+  end
+end
+
+RSpec.describe EagerEye::Fixers::AddIncludes do
+  describe "#fixable?" do
+    it "returns true for loop_association issue with iteration line nearby" do
+      issue = EagerEye::Issue.new(
+        detector: :loop_association,
+        file_path: "test.rb",
+        line_number: 2,
+        message: "Potential N+1 query",
+        severity: :warning,
+        suggestion: "Use `includes(:comments)` before iterating"
+      )
+      source = "@posts.each do |post|\n  post.comments\nend\n"
+
+      fixer = described_class.new(issue, source)
+      expect(fixer.fixable?).to be true
+    end
+
+    it "returns false when suggestion has no includes" do
+      issue = EagerEye::Issue.new(
+        detector: :loop_association,
+        file_path: "test.rb",
+        line_number: 2,
+        message: "test",
+        severity: :warning,
+        suggestion: "Preload the data or restructure to avoid per-record queries"
+      )
+      source = "@posts.each do |post|\n  post.comments\nend\n"
+
+      fixer = described_class.new(issue, source)
+      expect(fixer.fixable?).to be false
+    end
+  end
+
+  describe "#diff" do
+    it "inserts .includes before .each" do
+      issue = EagerEye::Issue.new(
+        detector: :loop_association,
+        file_path: "test.rb",
+        line_number: 2,
+        message: "Potential N+1 query",
+        severity: :warning,
+        suggestion: "Use `includes(:comments)` before iterating"
+      )
+      source = "@posts.each do |post|\n  post.comments\nend\n"
+
+      fixer = described_class.new(issue, source)
+      diff = fixer.diff
+
+      expect(diff[:original]).to eq("@posts.each do |post|")
+      expect(diff[:fixed]).to eq("@posts.includes(:comments).each do |post|")
+    end
+
+    it "inserts .includes before .map" do
+      issue = EagerEye::Issue.new(
+        detector: :loop_association,
+        file_path: "test.rb",
+        line_number: 2,
+        message: "Potential N+1 query",
+        severity: :warning,
+        suggestion: "Use `includes(:author)` before iterating"
+      )
+      source = "@posts.map do |post|\n  post.author\nend\n"
+
+      fixer = described_class.new(issue, source)
+      diff = fixer.diff
+
+      expect(diff[:original]).to eq("@posts.map do |post|")
+      expect(diff[:fixed]).to eq("@posts.includes(:author).map do |post|")
+    end
+  end
+end
+
 RSpec.describe EagerEye::FixerRegistry do
   describe ".fixer_for" do
     it "returns PluckToSelect fixer for pluck_to_array" do
@@ -193,9 +316,35 @@ RSpec.describe EagerEye::FixerRegistry do
       expect(fixer).to be_a(EagerEye::Fixers::PluckToSelect)
     end
 
-    it "returns nil for unsupported detectors" do
+    it "returns CountToSize fixer for count_in_iteration" do
+      issue = EagerEye::Issue.new(
+        detector: :count_in_iteration,
+        file_path: "test.rb",
+        line_number: 1,
+        message: "test",
+        severity: :warning
+      )
+
+      fixer = described_class.fixer_for(issue, "source")
+      expect(fixer).to be_a(EagerEye::Fixers::CountToSize)
+    end
+
+    it "returns AddIncludes fixer for loop_association" do
       issue = EagerEye::Issue.new(
         detector: :loop_association,
+        file_path: "test.rb",
+        line_number: 1,
+        message: "test",
+        severity: :warning
+      )
+
+      fixer = described_class.fixer_for(issue, "source")
+      expect(fixer).to be_a(EagerEye::Fixers::AddIncludes)
+    end
+
+    it "returns nil for unsupported detectors" do
+      issue = EagerEye::Issue.new(
+        detector: :callback_query,
         file_path: "test.rb",
         line_number: 1,
         message: "test",

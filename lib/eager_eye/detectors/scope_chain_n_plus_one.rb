@@ -4,7 +4,7 @@ module EagerEye
   module Detectors
     class ScopeChainNPlusOne < Base
       ITERATION_METHODS = %i[each map select find_all reject collect detect find_index flat_map
-                             find_each find_in_batches in_batches].freeze
+                             find_each find_in_batches in_batches array!].freeze
 
       def self.detector_name
         :scope_chain_n_plus_one
