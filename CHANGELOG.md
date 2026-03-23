@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.13] - 2026-03-23
+
+### Fixed
+
+- Fixed gem packaging issue where `CountToSize` and `AddIncludes` auto-fixer files were missing from the published gem
+
 ## [1.2.12] - 2026-03-20
 
 ### Added
