@@ -4,16 +4,20 @@ module EagerEye
   class AssociationParser
     ASSOCIATION_METHODS = %i[has_many has_one belongs_to has_and_belongs_to_many].freeze
 
-    attr_reader :preloaded_associations, :association_names
+    attr_reader :preloaded_associations, :association_names, :associations_by_model
 
     def initialize
       @preloaded_associations = {}
       @association_names = Set.new
+      @associations_by_model = {}
     end
 
     def parse_model(ast, model_name)
       return unless ast
 
+      # Register the model even if it declares no associations, so callers can
+      # distinguish "model has no associations" from "model unknown to parser".
+      @associations_by_model[model_name] ||= Set.new
       traverse(ast, model_name)
     end
 
@@ -37,6 +41,7 @@ module EagerEye
       return unless association_name
 
       @association_names << association_name
+      (@associations_by_model[model_name] ||= Set.new) << association_name
 
       preloaded = extract_preloaded_associations(node)
       return if preloaded.empty?

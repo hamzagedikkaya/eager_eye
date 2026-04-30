@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.14] - 2026-05-01
+
+### Fixed (false-positive reduction pass)
+
+- **Pagy / multi-assignment preload tracking** — `LoopAssociation` and `CustomMethodQuery` now follow preloads through `@pagy, items = pagy(query)` patterns and through wrapper calls like `pagy(...)`, `paginate(...)`, etc. Previously the `.includes(...)` on the wrapped query was lost across the multi-assign, generating false N+1 warnings on every preloaded association.
+- **Preloads through conditional / variable chains** — `extract_included_associations_deep` now walks ternary branches and inlined begin-blocks, and resolves `:lvar`/`:ivar` receivers via the variable preload map. `base = cond ? Q.includes(...).where(...) : Q.none` no longer drops preloads.
+- **Per-model association scoping** — `LoopAssociation` now infers the model class of the iteration variable and, when known, only flags methods that are actually associations on that model. This eliminates false positives where column accessors collide with hardcoded names (e.g. `log.tag`, `log.image`) or with associations defined on unrelated models.
+- **Per-model `method_queries` lookup** — `LoopAssociation` and `CustomMethodQuery` no longer flag `obj.foo` just because *some other* model defines a `def foo` containing a query. The match is scoped to the receiver's model when known, and association names on that model are excluded from the query-method check.
+- **`update_all` / `delete_all` / `destroy_all` chains** — `LoopAssociation` no longer flags association access whose only purpose is a non-loading terminal write (e.g. `avm.merchant_branches.update_all(...)`), since these don't trigger a SELECT for the association.
+- **`PluckToArray` `.where(...).all.pluck(:id)` mis-classification** — only an *unscoped* `.all.pluck(:id)` is escalated to error severity ("loads entire table"); chains scoped by `where`/`joins`/`limit`/etc. are no longer misreported as table-scans.
+
+### Changed
+
+- `AssociationParser` now exposes `associations_by_model` (a per-model `Set` of association names). Models with no declared associations are still registered, so detectors can distinguish "no associations" from "model unknown".
+- Detector signatures: `LoopAssociation#detect` and `CustomMethodQuery#detect` accept an `associations_by_model` argument (defaults to `{}`).
+
 ## [1.2.13] - 2026-03-23
 
 ### Fixed

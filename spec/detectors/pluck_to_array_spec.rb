@@ -370,5 +370,40 @@ RSpec.describe EagerEye::Detectors::PluckToArray do
         expect(issues).to be_empty
       end
     end
+
+    context "with .all preceded by a scoping method" do
+      it "does not flag .where(...).all.pluck(:id) as critical 'loads entire table'" do
+        code = <<~RUBY
+          ids = Foo.where(active: true).all.pluck(:id)
+          Bar.where(foo_id: ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        critical = issues.select { |i| i.severity == :error }
+        expect(critical).to be_empty
+      end
+
+      it "still flags unscoped .all.pluck(:id) as critical" do
+        code = <<~RUBY
+          ids = Foo.all.pluck(:id)
+          Bar.where(foo_id: ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        critical = issues.select { |i| i.severity == :error }
+        expect(critical).not_to be_empty
+      end
+
+      it "treats .joins(...).all.pluck as scoped" do
+        code = <<~RUBY
+          ids = Foo.joins(:bar).all.pluck(:id)
+          Bar.where(foo_id: ids)
+        RUBY
+        issues = detector.detect(parse(code), "test.rb")
+
+        critical = issues.select { |i| i.severity == :error }
+        expect(critical).to be_empty
+      end
+    end
   end
 end

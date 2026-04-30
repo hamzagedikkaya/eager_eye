@@ -19,24 +19,25 @@ module EagerEye
     }.freeze
 
     DETECTOR_EXTRA_ARGS = {
-      Detectors::LoopAssociation => %i[association_preloads association_names method_queries],
+      Detectors::LoopAssociation => %i[association_preloads association_names method_queries associations_by_model],
       Detectors::SerializerNesting => %i[association_names method_queries],
       Detectors::MissingCounterCache => %i[association_names],
       Detectors::DecoratorNPlusOne => %i[association_names method_queries],
-      Detectors::CustomMethodQuery => %i[method_queries],
+      Detectors::CustomMethodQuery => %i[method_queries associations_by_model],
       Detectors::DelegationNPlusOne => %i[delegation_maps],
       Detectors::ScopeChainNPlusOne => %i[scope_maps],
       Detectors::ValidationNPlusOne => %i[uniqueness_models]
     }.freeze
 
     attr_reader :paths, :issues, :association_preloads, :association_names, :method_queries, :delegation_maps,
-                :scope_maps, :uniqueness_models
+                :scope_maps, :uniqueness_models, :associations_by_model
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
       @issues = []
       @association_preloads = {}
       @association_names = Set.new
+      @associations_by_model = {}
       @method_queries = {}
       @delegation_maps = {}
       @scope_maps = {}
@@ -63,6 +64,9 @@ module EagerEye
         assoc_parser.parse_model(ast, model_name)
         @association_preloads.merge!(assoc_parser.preloaded_associations)
         @association_names.merge(assoc_parser.association_names)
+        assoc_parser.associations_by_model.each do |m, set|
+          (@associations_by_model[m] ||= Set.new).merge(set)
+        end
 
         deleg_parser = DelegationParser.new
         deleg_parser.parse_model(ast, model_name)

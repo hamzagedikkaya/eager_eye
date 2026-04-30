@@ -728,5 +728,127 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
         expect(issues.first.message).to include("post.author")
       end
     end
+
+    context "with pagy / multi-assignment preload tracking" do
+      it "does not flag association preloaded in pagy(query)" do
+        source = <<~RUBY
+          query = Post.includes(:author, :comments)
+          @pagy, posts = pagy(query)
+          posts.each do |post|
+            post.author
+            post.comments
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not flag when includes is inside pagy(...) call args" do
+        source = <<~RUBY
+          @pagy, posts = pagy(Post.includes(:author))
+          posts.each { |post| post.author }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not flag when query is built via ternary then included" do
+        source = <<~RUBY
+          base = condition ? Post.joins(:author).where(x: 1) : Post.none
+          @pagy, posts = pagy(base.includes(:author).order(:id))
+          posts.each { |post| post.author }
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with per-model association scoping" do
+      it "does not flag column access matching hardcoded name when model has no such association" do
+        source = <<~RUBY
+          logs.each do |log|
+            log.tag
+          end
+        RUBY
+
+        # ApplicationLog has no :tag association, but has other associations.
+        associations_by_model = { "ApplicationLog" => Set.new(%i[user]) }
+        # Ensure inferring ApplicationLog by tracking the variable's source:
+        source_with_source = <<~RUBY
+          logs = ApplicationLog.all
+          logs.each do |log|
+            log.tag
+          end
+        RUBY
+
+        issues = detector.detect(parse(source_with_source), "test.rb", {}, Set.new, {}, associations_by_model)
+        expect(issues).to be_empty
+      end
+
+      it "still flags real association calls when per-model map confirms it" do
+        source = <<~RUBY
+          posts = Post.all
+          posts.each { |post| post.author }
+        RUBY
+
+        associations_by_model = { "Post" => Set.new(%i[author]) }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, {}, associations_by_model)
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.author")
+      end
+
+      it "scopes method_queries lookup to the receiver's model" do
+        # `lookup_owner` is defined as a query method on PrepaidWallet (not on Order).
+        # Iterating Orders should NOT flag `order.lookup_owner`.
+        source = <<~RUBY
+          orders = Order.all
+          orders.each { |order| order.lookup_owner }
+        RUBY
+
+        method_queries = { "PrepaidWallet" => Set.new(%i[lookup_owner]) }
+        associations_by_model = { "Order" => Set.new(%i[customer]) }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, method_queries, associations_by_model)
+        expect(issues).to be_empty
+      end
+    end
+
+    context "with non-loading terminal methods" do
+      it "does not flag association access used only for update_all" do
+        source = <<~RUBY
+          Avm.find_each do |avm|
+            avm.merchant_branches.update_all(latitude: 1)
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "does not flag association access used only for delete_all" do
+        source = <<~RUBY
+          users.each do |user|
+            user.posts.delete_all
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues).to be_empty
+      end
+
+      it "still flags association when chain ends with a SELECT-triggering method" do
+        source = <<~RUBY
+          users.each do |user|
+            user.posts.first
+          end
+        RUBY
+
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("user.posts")
+      end
+    end
   end
 end

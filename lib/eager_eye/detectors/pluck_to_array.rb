@@ -4,10 +4,14 @@ require_relative "concerns/non_ar_source_detector"
 
 module EagerEye
   module Detectors
-    class PluckToArray < Base
+    class PluckToArray < Base # rubocop:disable Metrics/ClassLength
       include Concerns::NonArSourceDetector
 
       SMALL_COLLECTIONS = %w[tags settings options categories roles permissions statuses types priorities].freeze
+      SCOPING_METHODS = %i[where not limit offset order group having distinct
+                           joins left_joins left_outer_joins includes preload eager_load
+                           lock select from references unscope merge or rewhere reorder regroup
+                           in_order_of].freeze
 
       def self.detector_name
         :pluck_to_array
@@ -117,9 +121,31 @@ module EagerEye
         node.is_a?(Parser::AST::Node) && node.type == :send && %i[pluck ids].include?(node.children[1])
       end
 
+      # `.all.pluck(:id)` is "critical" only when the `.all` is unscoped — i.e.
+      # there's no `.where`/`.limit`/etc. earlier in the chain. Otherwise the
+      # query is already filtered and isn't loading the entire table.
       def all_pluck_call?(node)
-        pluck_call?(node) && node.children[0].is_a?(Parser::AST::Node) &&
-          node.children[0].type == :send && node.children[0].children[1] == :all
+        return false unless pluck_call?(node)
+
+        receiver = node.children[0]
+        return false unless receiver.is_a?(Parser::AST::Node) && receiver.type == :send
+        return false unless receiver.children[1] == :all
+
+        unscoped_all?(receiver)
+      end
+
+      def unscoped_all?(all_node)
+        receiver = all_node.children[0]
+        # `.all` with no receiver (just `all` in a model context) — treat as unscoped.
+        return true if receiver.nil?
+
+        while receiver.is_a?(Parser::AST::Node) && receiver.type == :send
+          return false if SCOPING_METHODS.include?(receiver.children[1])
+
+          receiver = receiver.children[0]
+        end
+
+        true
       end
 
       def small_collection_pluck?(node)

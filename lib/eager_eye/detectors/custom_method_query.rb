@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
+require_relative "concerns/variable_model_inference"
+
 module EagerEye
   module Detectors
     class CustomMethodQuery < Base
+      include Concerns::VariableModelInference
+
       QUERY_METHODS = %i[where find_by find_by! exists? find first last take pluck ids count sum average minimum
                          maximum].freeze
       SAFE_QUERY_METHODS = %i[first last take count sum find size length ids].freeze
@@ -16,16 +20,19 @@ module EagerEye
         :custom_method_query
       end
 
-      def detect(ast, file_path, method_queries = {})
+      def detect(ast, file_path, method_queries = {}, associations_by_model = {})
         return [] unless ast
 
         @issues = []
         @file_path = file_path
         @method_queries = method_queries
+        @associations_by_model = associations_by_model
+        @variable_models = {}
 
         find_iteration_blocks(ast) do |block_body, block_var, collection, definitions|
+          model_name = infer_model_from_value(collection)
           check_block_for_query_methods(block_body, block_var, collection_is_array?(collection, definitions))
-          check_block_for_model_query_methods(block_body, block_var)
+          check_block_for_model_query_methods(block_body, block_var, model_name)
         end
 
         @issues
@@ -36,7 +43,7 @@ module EagerEye
       def find_iteration_blocks(node, definitions = {}, &block)
         return unless node.is_a?(Parser::AST::Node)
 
-        definitions[node.children[0]] = node.children[1] if node.type == :lvasgn
+        record_definition(node, definitions)
 
         if iteration_block?(node)
           block_var = extract_iteration_variable(node)
@@ -44,6 +51,43 @@ module EagerEye
           yield(block_body, block_var, node.children[0], definitions) if block_var && block_body
         end
         node.children.each { |child| find_iteration_blocks(child, definitions, &block) }
+      end
+
+      def record_definition(node, definitions)
+        case node.type
+        when :lvasgn then record_simple_definition(node, :lvar, definitions)
+        when :ivasgn then record_simple_definition(node, :ivar, nil)
+        when :masgn  then record_multi_definition(node, definitions)
+        end
+      end
+
+      def record_simple_definition(node, var_type, definitions)
+        name = node.children[0]
+        value = node.children[1]
+        return unless name && value
+
+        definitions[name] = value if definitions
+        model = infer_model_from_value(value)
+        @variable_models[[var_type, name]] = model if model
+      end
+
+      def record_multi_definition(node, definitions)
+        mlhs, rhs = node.children
+        return unless mlhs && rhs
+
+        model = infer_model_from_value(rhs)
+        mlhs.children.each { |target| record_multi_target(target, rhs, model, definitions) }
+      end
+
+      def record_multi_target(target, rhs, model, definitions)
+        return unless %i[lvasgn ivasgn].include?(target&.type)
+
+        tname = target.children[0]
+        return if PAGINATION_META_NAMES.include?(tname)
+
+        var_type = target.type == :lvasgn ? :lvar : :ivar
+        @variable_models[[var_type, tname]] = model if model
+        definitions[tname] = rhs if target.type == :lvasgn
       end
 
       def iteration_block?(node)
@@ -115,10 +159,10 @@ module EagerEye
         node.is_a?(Parser::AST::Node) && node.type == :send && QUERY_METHODS.include?(node.children[1])
       end
 
-      def check_block_for_model_query_methods(node, block_var)
+      def check_block_for_model_query_methods(node, block_var, model_name)
         return unless node.is_a?(Parser::AST::Node)
 
-        if model_query_call?(node, block_var)
+        if model_query_call?(node, block_var, model_name)
           method = node.children[1]
           @issues << create_issue(
             file_path: @file_path,
@@ -127,17 +171,38 @@ module EagerEye
             suggestion: "This method executes a query on each iteration. Preload data or move the query outside."
           )
         end
-        node.children.each { |child| check_block_for_model_query_methods(child, block_var) }
+        node.children.each { |child| check_block_for_model_query_methods(child, block_var, model_name) }
       end
 
-      def model_query_call?(node, block_var)
-        return false unless node.type == :send
+      def model_query_call?(node, block_var, model_name)
+        return false unless block_var_immediate_send?(node, block_var)
 
-        receiver = node.children[0]
         method = node.children[1]
-        return false unless receiver&.type == :lvar && receiver.children[0] == block_var
+        # If we know the receiver model AND the method is one of its
+        # associations, treat it as an association access — not a query method.
+        return false if association_on_model?(method, model_name)
 
-        @method_queries&.any? { |_model, methods| methods.include?(method) }
+        method_defined_as_query?(method, model_name)
+      end
+
+      def block_var_immediate_send?(node, block_var)
+        node.type == :send &&
+          (receiver = node.children[0])&.type == :lvar &&
+          receiver.children[0] == block_var
+      end
+
+      def association_on_model?(method, model_name)
+        model_name && @associations_by_model&.dig(model_name)&.include?(method)
+      end
+
+      def method_defined_as_query?(method, model_name)
+        return false unless @method_queries
+
+        if model_name
+          @method_queries[model_name]&.include?(method) || false
+        else
+          @method_queries.any? { |_model, methods| methods.include?(method) }
+        end
       end
 
       def add_issue(node)

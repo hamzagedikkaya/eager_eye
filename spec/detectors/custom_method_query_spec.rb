@@ -637,5 +637,57 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
         expect(issues).to be_empty
       end
     end
+
+    context "with per-model method query scoping" do
+      it "does not flag a method defined on a different model" do
+        source = <<~RUBY
+          bars = Bar.all
+          bars.each { |bar| bar.lookup }
+        RUBY
+
+        method_queries = { "Foo" => Set[:lookup] }
+        issues = detector.detect(parse(source), "test.rb", method_queries, {})
+
+        expect(issues).to be_empty
+      end
+
+      it "still flags when the method is defined on the iterated model" do
+        source = <<~RUBY
+          orders = Order.all
+          orders.each { |order| order.expensive_calc }
+        RUBY
+
+        method_queries = { "Order" => Set[:expensive_calc] }
+        issues = detector.detect(parse(source), "test.rb", method_queries, {})
+
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include(".expensive_calc")
+      end
+
+      it "does not flag a method that the iterated model defines as an association" do
+        source = <<~RUBY
+          orders = Order.all
+          orders.each { |order| order.customer }
+        RUBY
+
+        method_queries = { "PrepaidWallet" => Set[:customer] }
+        associations_by_model = { "Order" => Set.new(%i[customer]) }
+        issues = detector.detect(parse(source), "test.rb", method_queries, associations_by_model)
+
+        expect(issues).to be_empty
+      end
+
+      it "infers receiver model through pagy multi-assignment" do
+        source = <<~RUBY
+          @pagy, orders = pagy(Order.all)
+          orders.each { |order| order.lookup }
+        RUBY
+
+        method_queries = { "Foo" => Set[:lookup] }
+        issues = detector.detect(parse(source), "test.rb", method_queries, {})
+
+        expect(issues).to be_empty
+      end
+    end
   end
 end
