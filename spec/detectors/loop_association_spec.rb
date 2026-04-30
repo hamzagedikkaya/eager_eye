@@ -768,11 +768,7 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
 
     context "with per-model association scoping" do
       it "does not flag column access matching hardcoded name when model has no such association" do
-        source = <<~RUBY
-          logs.each do |log|
-            log.tag
-          end
-        RUBY
+        logs.each(&:tag)
 
         # ApplicationLog has no :tag association, but has other associations.
         associations_by_model = { "ApplicationLog" => Set.new(%i[user]) }
