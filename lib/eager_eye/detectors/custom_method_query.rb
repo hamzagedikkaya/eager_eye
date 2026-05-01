@@ -4,7 +4,7 @@ require_relative "concerns/variable_model_inference"
 
 module EagerEye
   module Detectors
-    class CustomMethodQuery < Base
+    class CustomMethodQuery < Base # rubocop:disable Metrics/ClassLength
       include Concerns::VariableModelInference
 
       QUERY_METHODS = %i[where find_by find_by! exists? find first last take pluck ids count sum average minimum
@@ -27,30 +27,178 @@ module EagerEye
         @file_path = file_path
         @method_queries = method_queries
         @associations_by_model = associations_by_model
-        @variable_models = {}
 
-        find_iteration_blocks(ast) do |block_body, block_var, collection, definitions|
-          model_name = infer_model_from_value(collection)
-          check_block_for_query_methods(block_body, block_var, collection_is_array?(collection, definitions))
-          check_block_for_model_query_methods(block_body, block_var, model_name)
-        end
+        # Process each method def as its own scope so variable models from one
+        # method don't bleed into another (e.g. `orders = Order.all` in #index
+        # vs `orders = Foo.where(...).all` in #report — global tracking would
+        # mis-attribute the iteration variable's class across scopes).
+        process_scope(ast, {})
 
         @issues
       end
 
       private
 
-      def find_iteration_blocks(node, definitions = {}, &block)
+      def process_scope(scope_node, definitions)
+        @variable_models ||= {}
+        scope_body = scope_body_for(scope_node)
+        return unless scope_body
+
+        find_iteration_blocks_in_scope(scope_body, definitions)
+
+        process_nested_defs(scope_body, definitions)
+      end
+
+      def process_nested_defs(scope_body, definitions)
+        nested_defs = []
+        each_nested_def(scope_body) { |d| nested_defs << d }
+        return if nested_defs.empty?
+
+        call_sites_by_callee = collect_sibling_call_sites(nested_defs)
+
+        nested_defs.each do |nested_def|
+          with_scope_snapshot do
+            seed_params_from_callers(nested_def, call_sites_by_callee)
+            process_scope(nested_def, definitions.dup)
+          end
+        end
+      end
+
+      # See LoopAssociation#collect_sibling_call_sites for the rationale.
+      def collect_sibling_call_sites(nested_defs)
+        sibling_names = nested_defs.filter_map { |d| def_name(d) }.to_set
+        result = Hash.new { |h, k| h[k] = [] }
+
+        nested_defs.each do |def_node|
+          def_body = scope_body_for(def_node)
+          next unless def_body
+
+          with_scope_snapshot do
+            each_node_in_scope(def_body) do |node|
+              record_definition(node, {})
+              next unless self_send_to_sibling?(node, sibling_names)
+
+              result[node.children[1]] << {
+                args: node.children[2..],
+                models: @variable_models.dup
+              }
+            end
+          end
+        end
+
+        result
+      end
+
+      def self_send_to_sibling?(node, sibling_names)
+        return false unless node.type == :send
+
+        receiver = node.children[0]
+        return false unless receiver.nil? || (receiver.is_a?(Parser::AST::Node) && receiver.type == :self)
+
+        sibling_names.include?(node.children[1])
+      end
+
+      def def_name(def_node)
+        case def_node.type
+        when :def  then def_node.children[0]
+        when :defs then def_node.children[1]
+        end
+      end
+
+      def seed_params_from_callers(def_node, call_sites_by_callee)
+        return unless def_node.type == :def
+
+        call_sites = call_sites_by_callee[def_name(def_node)]
+        return if call_sites.nil? || call_sites.empty?
+
+        extract_param_names(def_node).each_with_index do |param_name, idx|
+          model = first_arg_model(call_sites, idx)
+          @variable_models[[:lvar, param_name]] = model if model
+        end
+      end
+
+      def first_arg_model(call_sites, idx)
+        call_sites.each do |site|
+          arg = site[:args][idx]
+          next unless arg
+
+          saved = @variable_models
+          @variable_models = site[:models]
+          model = infer_model_from_value(arg)
+          @variable_models = saved
+          return model if model
+        end
+        nil
+      end
+
+      def extract_param_names(def_node)
+        args_node = def_node.children[1]
+        return [] unless args_node.is_a?(Parser::AST::Node) && args_node.type == :args
+
+        args_node.children.filter_map do |arg|
+          next unless arg.is_a?(Parser::AST::Node) && %i[arg optarg kwarg kwoptarg].include?(arg.type)
+
+          arg.children[0]
+        end
+      end
+
+      def scope_body_for(node)
+        return node unless node.is_a?(Parser::AST::Node)
+
+        case node.type
+        when :def  then node.children[2]
+        when :defs then node.children[3]
+        else node
+        end
+      end
+
+      def with_scope_snapshot
+        saved_models = @variable_models.dup
+        yield
+      ensure
+        @variable_models = saved_models
+      end
+
+      def each_node_in_scope(node, &block)
         return unless node.is_a?(Parser::AST::Node)
 
-        record_definition(node, definitions)
+        yield node
 
-        if iteration_block?(node)
+        node.children.each do |child|
+          next unless child.is_a?(Parser::AST::Node)
+          next if %i[def defs].include?(child.type)
+
+          each_node_in_scope(child, &block)
+        end
+      end
+
+      def each_nested_def(node, &block)
+        return unless node.is_a?(Parser::AST::Node)
+
+        node.children.each do |child|
+          next unless child.is_a?(Parser::AST::Node)
+
+          if %i[def defs].include?(child.type)
+            yield child
+          else
+            each_nested_def(child, &block)
+          end
+        end
+      end
+
+      def find_iteration_blocks_in_scope(scope_body, definitions)
+        each_node_in_scope(scope_body) do |node|
+          record_definition(node, definitions)
+          next unless iteration_block?(node)
+
           block_var = extract_iteration_variable(node)
           block_body = node.children[2]
-          yield(block_body, block_var, node.children[0], definitions) if block_var && block_body
+          next unless block_var && block_body
+
+          model_name = infer_model_from_value(node.children[0])
+          check_block_for_query_methods(block_body, block_var, collection_is_array?(node.children[0], definitions))
+          check_block_for_model_query_methods(block_body, block_var, model_name)
         end
-        node.children.each { |child| find_iteration_blocks(child, definitions, &block) }
       end
 
       def record_definition(node, definitions)

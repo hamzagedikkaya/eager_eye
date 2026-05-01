@@ -43,33 +43,22 @@ module EagerEye
                  method_queries = {}, associations_by_model = {})
         return [] unless ast
 
-        issues = []
+        @issues = []
+        @file_path = file_path
         @association_preloads = association_preloads
         @dynamic_associations = association_names
         @method_queries = method_queries
         @associations_by_model = associations_by_model
-        build_variable_maps(ast)
 
-        traverse_ast(ast) do |node|
-          next unless iteration_block?(node)
+        # Variable preloads/models leak across methods if tracked globally
+        # (e.g. controller#index sets `invoices = Invoice.includes(...)`, then
+        # controller#auto_match overwrites with `invoices = Invoice.where(...)`
+        # — the second assignment would erase the first method's preload data).
+        # Process each method scope independently and inherit a snapshot from
+        # the enclosing scope (top-level / outer class body).
+        process_scope(ast)
 
-          block_var = extract_iteration_variable(node)
-          next unless block_var
-
-          block_body = node.children[2]
-          next unless block_body
-
-          collection_node = node.children[0]
-          next if single_record_iteration?(collection_node)
-
-          included = collect_included_associations(collection_node)
-          model_name = infer_model_from_value(collection_node)
-          skip_nodes = collect_non_loading_skip_set(block_body)
-
-          find_association_calls(block_body, block_var, file_path, issues, included, model_name, skip_nodes)
-        end
-
-        issues
+        @issues
       end
 
       private
@@ -140,12 +129,235 @@ module EagerEye
         included.merge(@variable_preloads[key]) if @variable_preloads&.key?(key)
       end
 
-      def build_variable_maps(ast)
-        @variable_preloads = {}
-        @variable_models = {}
-        @single_record_variables = Set.new
+      # Walk this scope's body, then recurse into nested method defs as fresh
+      # scopes. A method def inherits a snapshot of the enclosing scope's
+      # variable state (so top-level lets/instance vars stay visible), but its
+      # own changes do not leak back out. Nested defs are processed in two
+      # passes: first to collect call sites between siblings (so we know which
+      # arguments each method receives at call time), then to actually analyze
+      # each def with its parameters seeded from caller context.
+      def process_scope(scope_node)
+        @variable_preloads ||= {}
+        @variable_models ||= {}
+        @single_record_variables ||= Set.new
 
-        traverse_ast(ast) { |node| process_variable_assignment(node) }
+        scope_body = scope_body_for(scope_node)
+        return unless scope_body
+
+        build_variable_maps_in_scope(scope_body)
+        find_iterations_in_scope(scope_body)
+
+        process_nested_defs(scope_body)
+      end
+
+      def process_nested_defs(scope_body)
+        nested_defs = collect_nested_defs(scope_body)
+        return if nested_defs.empty?
+
+        call_sites_by_callee = collect_sibling_call_sites(nested_defs)
+
+        nested_defs.each do |nested_def|
+          with_scope_snapshot do
+            seed_params_from_callers(nested_def, call_sites_by_callee)
+            process_scope(nested_def)
+          end
+        end
+      end
+
+      def collect_nested_defs(scope_body)
+        defs = []
+        each_nested_def(scope_body) { |d| defs << d }
+        defs
+      end
+
+      # For each sibling def in this class/module body, build its variable map
+      # in isolation and capture every self-send to ANOTHER sibling. The
+      # captured snapshot is the caller's variable state at the call site —
+      # later we re-evaluate the call's arg expressions against this snapshot
+      # to derive the callee's parameter contexts.
+      def collect_sibling_call_sites(nested_defs)
+        sibling_names = nested_defs.filter_map { |d| def_name(d) }.to_set
+        result = Hash.new { |h, k| h[k] = [] }
+
+        nested_defs.each do |def_node|
+          def_body = scope_body_for(def_node)
+          next unless def_body
+
+          with_scope_snapshot do
+            build_variable_maps_in_scope(def_body)
+            capture_calls_to_siblings(def_body, sibling_names, result)
+          end
+        end
+
+        result
+      end
+
+      def capture_calls_to_siblings(def_body, sibling_names, result)
+        each_node_in_scope(def_body) do |node|
+          next unless self_send_to_sibling?(node, sibling_names)
+
+          callee = node.children[1]
+          result[callee] << {
+            args: node.children[2..],
+            preloads: @variable_preloads.dup,
+            models: @variable_models.dup
+          }
+        end
+      end
+
+      def self_send_to_sibling?(node, sibling_names)
+        return false unless node.type == :send
+
+        receiver = node.children[0]
+        return false unless receiver.nil? || (receiver.is_a?(Parser::AST::Node) && receiver.type == :self)
+
+        sibling_names.include?(node.children[1])
+      end
+
+      def def_name(def_node)
+        case def_node.type
+        when :def  then def_node.children[0]
+        when :defs then def_node.children[1]
+        end
+      end
+
+      # If `def_node` is called by sibling defs in this class, evaluate each
+      # call site's arguments in that caller's context and bind the resulting
+      # preloads/model to the callee's parameter names. This is what eliminates
+      # the "helper method receives a preloaded relation" false positive.
+      def seed_params_from_callers(def_node, call_sites_by_callee)
+        return unless def_node.type == :def
+
+        name = def_name(def_node)
+        call_sites = call_sites_by_callee[name]
+        return if call_sites.nil? || call_sites.empty?
+
+        param_names = extract_param_names(def_node)
+        param_names.each_with_index do |param_name, idx|
+          seed_single_param(param_name, idx, call_sites)
+        end
+      end
+
+      def seed_single_param(param_name, idx, call_sites)
+        merged_preloads = Set.new
+        chosen_model = nil
+
+        call_sites.each do |site|
+          arg = site[:args][idx]
+          next unless arg
+
+          with_call_site_context(site) do
+            merged_preloads.merge(extract_included_associations_deep(arg))
+            chosen_model ||= infer_model_from_value(arg)
+          end
+        end
+
+        key = [:lvar, param_name]
+        @variable_preloads[key] = merged_preloads unless merged_preloads.empty?
+        @variable_models[key] = chosen_model if chosen_model
+      end
+
+      def with_call_site_context(site)
+        saved_preloads = @variable_preloads
+        saved_models = @variable_models
+        @variable_preloads = site[:preloads]
+        @variable_models = site[:models]
+        yield
+      ensure
+        @variable_preloads = saved_preloads
+        @variable_models = saved_models
+      end
+
+      def extract_param_names(def_node)
+        args_node = def_node.children[1]
+        return [] unless args_node.is_a?(Parser::AST::Node) && args_node.type == :args
+
+        args_node.children.filter_map do |arg|
+          next unless arg.is_a?(Parser::AST::Node)
+          # Skip blockarg/restarg/kwrestarg etc. — only positional/optional/kwarg names.
+          next unless %i[arg optarg kwarg kwoptarg].include?(arg.type)
+
+          arg.children[0]
+        end
+      end
+
+      def scope_body_for(node)
+        return node unless node.is_a?(Parser::AST::Node)
+
+        case node.type
+        when :def  then node.children[2]
+        when :defs then node.children[3]
+        else node
+        end
+      end
+
+      def with_scope_snapshot
+        saved_preloads = @variable_preloads.dup
+        saved_models = @variable_models.dup
+        saved_single = @single_record_variables.dup
+        yield
+      ensure
+        @variable_preloads = saved_preloads
+        @variable_models = saved_models
+        @single_record_variables = saved_single
+      end
+
+      # Yields every node inside `scope_body` but stops at any :def/:defs —
+      # those subtrees represent fresh scopes and are visited separately.
+      def each_node_in_scope(node, &block)
+        return unless node.is_a?(Parser::AST::Node)
+
+        yield node
+
+        node.children.each do |child|
+          next unless child.is_a?(Parser::AST::Node)
+          next if %i[def defs].include?(child.type)
+
+          each_node_in_scope(child, &block)
+        end
+      end
+
+      # Yields each immediately-nested :def/:defs (not deeper-nested ones —
+      # those are visited via that def's own process_scope call).
+      def each_nested_def(node, &block)
+        return unless node.is_a?(Parser::AST::Node)
+
+        node.children.each do |child|
+          next unless child.is_a?(Parser::AST::Node)
+
+          if %i[def defs].include?(child.type)
+            yield child
+          else
+            each_nested_def(child, &block)
+          end
+        end
+      end
+
+      def build_variable_maps_in_scope(scope_body)
+        each_node_in_scope(scope_body) { |node| process_variable_assignment(node) }
+      end
+
+      def find_iterations_in_scope(scope_body)
+        each_node_in_scope(scope_body) do |node|
+          process_iteration_block(node) if iteration_block?(node)
+        end
+      end
+
+      def process_iteration_block(node)
+        block_var = extract_iteration_variable(node)
+        return unless block_var
+
+        block_body = node.children[2]
+        return unless block_body
+
+        collection_node = node.children[0]
+        return if single_record_iteration?(collection_node)
+
+        included = collect_included_associations(collection_node)
+        model_name = infer_model_from_value(collection_node)
+        skip_nodes = collect_non_loading_skip_set(block_body)
+
+        find_association_calls(block_body, block_var, @file_path, @issues, included, model_name, skip_nodes)
       end
 
       def process_variable_assignment(node)

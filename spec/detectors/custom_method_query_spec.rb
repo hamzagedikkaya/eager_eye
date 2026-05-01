@@ -688,6 +688,30 @@ RSpec.describe EagerEye::Detectors::CustomMethodQuery do
 
         expect(issues).to be_empty
       end
+
+      it "scopes inferred model through caller-method param seeding" do
+        source = <<~RUBY
+          class Controller
+            def index
+              orders = Order.where(active: true)
+              prepare(orders)
+            end
+
+            def prepare(orders)
+              orders.each { |order| order.lookup }
+            end
+          end
+        RUBY
+
+        # `lookup` is defined as a query on `Foo`, not `Order`. Without seeding
+        # the caller's model context, `prepare` would have no model for
+        # `orders` and fall back to global match (flagging the method).
+        # With caller seeding it correctly knows `orders` are `Order`s.
+        method_queries = { "Foo" => Set[:lookup] }
+        issues = detector.detect(parse(source), "test.rb", method_queries, {})
+
+        expect(issues).to be_empty
+      end
     end
   end
 end

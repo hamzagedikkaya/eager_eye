@@ -808,6 +808,110 @@ RSpec.describe EagerEye::Detectors::LoopAssociation do
       end
     end
 
+    context "with caller-method preload tracking" do
+      it "does not flag iteration on a method param when caller passed a preloaded relation" do
+        source = <<~RUBY
+          class IssuesController
+            def index
+              issues = Issue.includes(:ticket, :issue_status).where(active: true)
+              prepare_data(issues)
+            end
+
+            def prepare_data(issues)
+              issues.map { |issue| [issue.id, issue.issue_status, issue.ticket] }
+            end
+          end
+        RUBY
+
+        associations_by_model = { "Issue" => Set.new(%i[ticket issue_status]) }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, {}, associations_by_model)
+        expect(issues).to be_empty
+      end
+
+      it "still flags when caller does NOT preload the accessed association" do
+        source = <<~RUBY
+          class PostsController
+            def index
+              posts = Post.where(active: true)
+              render_them(posts)
+            end
+
+            def render_them(posts)
+              posts.each { |post| post.author }
+            end
+          end
+        RUBY
+
+        associations_by_model = { "Post" => Set.new(%i[author]) }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, {}, associations_by_model)
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("post.author")
+      end
+
+      it "follows preload through pagy multi-assignment in the caller" do
+        source = <<~RUBY
+          class FoosController
+            def index
+              query = Foo.includes(:bar)
+              @pagy, foos = pagy(query)
+              prepare(foos)
+            end
+
+            def prepare(foos)
+              foos.map { |f| f.bar }
+            end
+          end
+        RUBY
+
+        associations_by_model = { "Foo" => Set.new(%i[bar]) }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, {}, associations_by_model)
+        expect(issues).to be_empty
+      end
+
+      it "merges preloads from multiple call sites (treats union as preloaded)" do
+        source = <<~RUBY
+          class UsersController
+            def index
+              users = User.includes(:profile, :posts)
+              decorate(users)
+            end
+
+            def show
+              users = User.includes(:profile)
+              decorate(users)
+            end
+
+            def decorate(users)
+              users.each { |u| [u.profile, u.posts] }
+            end
+          end
+        RUBY
+
+        associations_by_model = { "User" => Set.new(%i[profile posts]) }
+        issues = detector.detect(parse(source), "test.rb", {}, Set.new, {}, associations_by_model)
+        # `:posts` is only preloaded by one of two callers; with the permissive
+        # "any caller preloads" heuristic, we suppress the warning to avoid FPs.
+        expect(issues).to be_empty
+      end
+
+      it "does not crash when a method has params but no sibling callers" do
+        source = <<~RUBY
+          class FoosController
+            def standalone(foos)
+              foos.each { |f| f.posts }
+            end
+          end
+        RUBY
+
+        # No siblings call `standalone`, so no seeding happens; receiver model
+        # is unknown, so detection falls back to the global heuristic. `:posts`
+        # is in the hardcoded ASSOCIATION_NAMES list, so it gets flagged.
+        issues = detector.detect(parse(source), "test.rb")
+        expect(issues.size).to eq(1)
+        expect(issues.first.message).to include("f.posts")
+      end
+    end
+
     context "with non-loading terminal methods" do
       it "does not flag association access used only for update_all" do
         source = <<~RUBY

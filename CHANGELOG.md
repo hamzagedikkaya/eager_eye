@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.15] - 2026-05-01
+
+### Fixed
+
+- **Per-method scope for variable preload tracking** — `LoopAssociation` and
+  `CustomMethodQuery` now process each `:def`/`:defs` body as an independent
+  scope. Previously a later assignment in another method (e.g.
+  `invoices = Invoice.includes(:invoice_items).where(...)` inside one action)
+  could overwrite the preload set for the same variable name in an earlier
+  action, producing false N+1 warnings on associations that were actually
+  preloaded. Each scope now inherits a snapshot from the enclosing scope but
+  its own writes do not leak back out.
+- **Caller-method preload tracking** — `LoopAssociation` and
+  `CustomMethodQuery` now propagate preload/model context across method calls
+  within the same class. When `def index` does
+  `items = Foo.includes(:bar); prepare_data(items)` and `def prepare_data(items)`
+  iterates the parameter, the `:bar` association is now correctly recognized
+  as preloaded. Previously every helper method that received a relation by
+  parameter produced false positives because the parameter had no preload
+  context.
+- Sibling defs in the same scope are processed in two passes: first to capture
+  each `self`-call's argument context, then to seed the callee's parameters
+  before analyzing its body. Multiple call sites are merged permissively (any
+  caller preloading suppresses the warning) to avoid false positives at the
+  expense of potentially missing helpers that have BOTH preloaded and
+  unpreloaded callers.
+
 ## [1.2.14] - 2026-05-01
 
 ### Fixed (false-positive reduction pass)
