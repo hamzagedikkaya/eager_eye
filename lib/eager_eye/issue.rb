@@ -16,6 +16,18 @@ module EagerEye
       @suggestion = suggestion
     end
 
+    def self.from_h(hash)
+      h = hash.transform_keys(&:to_sym)
+      new(
+        detector: h.fetch(:detector).to_sym,
+        file_path: h.fetch(:file_path),
+        line_number: h.fetch(:line_number),
+        message: h.fetch(:message),
+        severity: (h[:severity] || :warning).to_sym,
+        suggestion: h[:suggestion]
+      )
+    end
+
     def severity_level
       SEVERITY_ORDER[severity]
     end
@@ -26,12 +38,12 @@ module EagerEye
 
     def to_h
       {
-        detector: detector,
-        file_path: file_path,
-        line_number: line_number,
-        message: message,
-        severity: severity,
-        suggestion: suggestion
+        detector:,
+        file_path:,
+        line_number:,
+        message:,
+        severity:,
+        suggestion:
       }
     end
 

@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "json"
+require "tempfile"
+
 RSpec.describe EagerEye::CLI do
   let(:fixtures_path) { File.expand_path("fixtures", __dir__) }
 
@@ -115,6 +118,51 @@ RSpec.describe EagerEye::CLI do
         output = capture_stdout { cli.run }
 
         expect(output).not_to include("\e[")
+      end
+    end
+
+    context "with --baseline" do
+      let(:sample_path) { File.join(fixtures_path, "sample_controller.rb") }
+
+      def capture_baseline(args)
+        cli = described_class.new(args + ["--format", "json"])
+        capture_stdout { cli.run }
+      end
+
+      it "suppresses issues that already exist in baseline" do
+        baseline_json = capture_baseline([sample_path])
+        baseline_file = Tempfile.new(["baseline", ".json"])
+        baseline_file.write(baseline_json)
+        baseline_file.close
+
+        cli = described_class.new([sample_path, "--baseline", baseline_file.path, "--format", "json"])
+        output = capture_stdout { cli.run }
+
+        expect(JSON.parse(output)["issues"]).to eq([])
+      end
+
+      it "exits 0 when all issues are baselined" do
+        baseline_json = capture_baseline([sample_path])
+        baseline_file = Tempfile.new(["baseline", ".json"])
+        baseline_file.write(baseline_json)
+        baseline_file.close
+
+        cli = described_class.new([sample_path, "--baseline", baseline_file.path, "--no-color"])
+        expect(cli.run).to eq(0)
+      end
+
+      it "exits 1 with a clear error when baseline file is missing" do
+        cli = described_class.new([sample_path, "--baseline", "/no/such/baseline.json", "--no-color"])
+        expect { cli.run }.to output(/Error: Baseline file not found/).to_stderr.and(raise_error(SystemExit))
+      end
+
+      it "exits 1 with a clear error when baseline JSON is malformed" do
+        bad = Tempfile.new(["bad", ".json"])
+        bad.write("{ not json")
+        bad.close
+
+        cli = described_class.new([sample_path, "--baseline", bad.path, "--no-color"])
+        expect { cli.run }.to output(/Error: Invalid JSON in baseline/).to_stderr.and(raise_error(SystemExit))
       end
     end
   end

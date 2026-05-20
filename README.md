@@ -350,6 +350,25 @@ jobs:
 
 See [examples/github_action.yml](examples/github_action.yml) for a fuller setup with PR annotations.
 
+### Baseline mode (brownfield projects)
+
+Most existing Rails apps have hundreds of N+1 issues already — failing CI on
+every one of them is noise. Capture today's report as a baseline and let CI
+fail **only on regressions** (new issues introduced by a PR):
+
+```bash
+# One-time: capture the current state as the baseline
+eager_eye app/ --format json > .eager_eye_baseline.json
+
+# In CI: only NEW issues count
+eager_eye app/ --baseline .eager_eye_baseline.json
+```
+
+The baseline file is a normal `--format json` report. Refresh it as you
+fix existing issues. The match key is `(detector, file_path, line_number,
+message, severity, suggestion)` — if any of those change for a known issue,
+it shows up as "new" until the baseline is refreshed.
+
 ## RSpec integration
 
 ```ruby
@@ -421,6 +440,8 @@ Usage: eager_eye [paths] [options]
   -s, --min-severity LEVEL  info | warning | error
       --no-fail             always exit 0
       --no-color            plain output
+      --baseline FILE       compare against a previous JSON report;
+                            only NEW issues are reported (and counted)
       --suggest-fixes       print fix diffs without applying
       --fix                 interactively apply auto-fixes
       --fix --force         apply all auto-fixes

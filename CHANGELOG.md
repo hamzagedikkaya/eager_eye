@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-20
+
+### Added
+
+- **`--baseline FILE` flag** — compare the current scan against a previously
+  captured JSON report and surface only issues that are NOT in the baseline.
+  Designed for the brownfield CI workflow: accept existing N+1s as the
+  baseline, fail builds only on regressions (new issues introduced by a PR).
+  Baseline files are produced by the existing `--format json` output (the
+  flag accepts either the full report-shaped object or a bare array of
+  issues). Malformed/missing baselines exit with a clear error message.
+- **`EagerEye::Issue.from_h(hash)`** — public factory that rebuilds an
+  `Issue` from its serialized form (e.g. a parsed JSON entry). Coerces
+  `detector`/`severity` strings back to symbols and defaults severity to
+  `:warning` when absent. Round-trips through `to_h` and `to_json`.
+- **`EagerEye::Baseline`** — the helper behind `--baseline`. Loads issues
+  from a JSON path (`Baseline.load_issues(path)`) and filters a current
+  issue list against them (`Baseline.filter(issues, path)`). Useful
+  programmatically for projects that wrap EagerEye in their own runner.
+
 ## [1.2.15] - 2026-05-01
 
 ### Fixed

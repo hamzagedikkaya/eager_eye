@@ -121,4 +121,55 @@ RSpec.describe EagerEye::Issue do
       expect(set.size).to eq(1)
     end
   end
+
+  describe ".from_h" do
+    let(:full_hash) do
+      {
+        detector: :loop_association,
+        file_path: "app/models/foo.rb",
+        line_number: 12,
+        message: "msg",
+        severity: :error,
+        suggestion: "do bar"
+      }
+    end
+
+    it "rebuilds an Issue equal to one constructed directly" do
+      from_h_issue = described_class.from_h(full_hash)
+      direct = described_class.new(**full_hash)
+      expect(from_h_issue).to eq(direct)
+    end
+
+    it "round-trips through to_h" do
+      original = described_class.new(**full_hash)
+      rebuilt = described_class.from_h(original.to_h)
+      expect(rebuilt).to eq(original)
+    end
+
+    it "round-trips through JSON" do
+      original = described_class.new(**full_hash)
+      rebuilt = described_class.from_h(JSON.parse(original.to_json))
+      expect(rebuilt).to eq(original)
+    end
+
+    it "coerces string detector to symbol" do
+      issue = described_class.from_h(full_hash.merge(detector: "callback_query"))
+      expect(issue.detector).to eq(:callback_query)
+    end
+
+    it "coerces string severity to symbol" do
+      issue = described_class.from_h(full_hash.merge(severity: "error"))
+      expect(issue.severity).to eq(:error)
+    end
+
+    it "defaults severity to :warning when missing" do
+      issue = described_class.from_h(full_hash.except(:severity))
+      expect(issue.severity).to eq(:warning)
+    end
+
+    it "raises KeyError when required field is missing" do
+      expect { described_class.from_h(full_hash.except(:file_path)) }
+        .to raise_error(KeyError)
+    end
+  end
 end

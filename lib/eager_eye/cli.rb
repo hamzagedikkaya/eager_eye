@@ -16,6 +16,7 @@ module EagerEye
       return 0 if options[:help] || options[:version]
 
       issues = analyze
+      issues = apply_baseline(issues) if options[:baseline]
 
       if options[:suggest_fixes]
         fixer = AutoFixer.new(issues)
@@ -48,7 +49,8 @@ module EagerEye
         version: false,
         suggest_fixes: false,
         fix: false,
-        force: false
+        force: false,
+        baseline: nil
       }
     end
 
@@ -103,6 +105,11 @@ module EagerEye
     def add_behavior_options(opts)
       opts.on("--no-fail", "Exit with 0 even if issues found") do
         options[:fail_on_issues] = false
+      end
+
+      opts.on("--baseline FILE",
+              "Compare against a previous JSON report; only show issues NOT in baseline") do |path|
+        options[:baseline] = path
       end
     end
 
@@ -164,6 +171,13 @@ module EagerEye
 
     def exit_code(issues)
       options[:fail_on_issues] && issues.any? ? 1 : 0
+    end
+
+    def apply_baseline(issues)
+      Baseline.filter(issues, options[:baseline])
+    rescue Baseline::InvalidBaselineError => e
+      warn "Error: #{e.message}"
+      exit 1
     end
   end
 end

@@ -350,6 +350,26 @@ jobs:
 
 PR annotation'lı tam örnek için bkz. [examples/github_action.yml](examples/github_action.yml).
 
+### Baseline modu (brownfield projeler)
+
+Çoğu mevcut Rails uygulamasında zaten yüzlerce N+1 sorunu var — her birinde
+CI'yi düşürmek anlamlı değil. Bugünkü raporu baseline olarak yakalayıp CI'nin
+**sadece regresyonlarda** (PR'ın eklediği yeni issue'larda) fail etmesini
+sağlayabilirsiniz:
+
+```bash
+# Tek seferlik: mevcut durumu baseline olarak yakala
+eager_eye app/ --format json > .eager_eye_baseline.json
+
+# CI'da: yalnızca YENİ issue'lar sayılır
+eager_eye app/ --baseline .eager_eye_baseline.json
+```
+
+Baseline dosyası standart `--format json` raporudur. Mevcut issue'ları
+düzelttikçe baseline'ı yenileyin. Eşleşme anahtarı: `(detector, file_path,
+line_number, message, severity, suggestion)` — bilinen bir issue'da bu
+alanlardan biri değişirse baseline yenilenene kadar "yeni" olarak görünür.
+
 ## RSpec entegrasyonu
 
 ```ruby
@@ -421,6 +441,8 @@ Kullanım: eager_eye [yollar] [seçenekler]
   -s, --min-severity LEVEL  info | warning | error
       --no-fail             her zaman 0 ile çık
       --no-color            düz çıktı
+      --baseline FILE       önceki bir JSON raporuyla karşılaştır;
+                            sadece YENİ issue'lar raporlanır (ve sayılır)
       --suggest-fixes       fix diff'lerini uygulamadan göster
       --fix                 interaktif olarak auto-fix uygula
       --fix --force         tüm auto-fix'leri uygula
