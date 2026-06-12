@@ -20,13 +20,14 @@ module EagerEye
         :custom_method_query
       end
 
-      def detect(ast, file_path, method_queries = {}, associations_by_model = {})
+      def detect(ast, file_path, method_queries = {}, associations_by_model = {}, all_columns = Set.new)
         return [] unless ast
 
         @issues = []
         @file_path = file_path
         @method_queries = method_queries
         @associations_by_model = associations_by_model
+        @all_columns = all_columns
 
         # Process each method def as its own scope so variable models from one
         # method don't bleed into another (e.g. `orders = Order.all` in #index
@@ -195,6 +196,11 @@ module EagerEye
           block_body = node.children[2]
           next unless block_var && block_body
 
+          # `x.in_batches.each { |batch| batch.pluck(...) }` — the block var is a
+          # batch relation and any query on it runs once per batch, which is the
+          # recommended fix for N+1, not a symptom. Skip those iterations.
+          next if batch_iteration?(node.children[0])
+
           model_name = infer_model_from_value(node.children[0])
           check_block_for_query_methods(block_body, block_var, collection_is_array?(node.children[0], definitions))
           check_block_for_model_query_methods(block_body, block_var, model_name)
@@ -243,6 +249,21 @@ module EagerEye
           ITERATION_METHODS.include?(node.children[0].children[1])
       end
 
+      BATCH_METHODS = %i[in_batches find_in_batches].freeze # rubocop:disable Lint/UselessConstantScoping
+
+      # True when the iterated collection comes from `in_batches`/`find_in_batches`
+      # — the block variable is a batch relation, so per-batch queries on it are
+      # the intended batching, not an N+1.
+      def batch_iteration?(node)
+        current = node
+        while current.is_a?(Parser::AST::Node) && current.type == :send
+          return true if BATCH_METHODS.include?(current.children[1])
+
+          current = current.children[0]
+        end
+        false
+      end
+
       def check_block_for_query_methods(node, block_var, is_array_collection = false) # rubocop:disable Style/OptionalBooleanParameter
         return unless node.is_a?(Parser::AST::Node)
 
@@ -255,10 +276,29 @@ module EagerEye
 
         method_name = node.children[1]
         return false unless QUERY_METHODS.include?(method_name)
+        return false if enumerable_form?(node)
+        return false if direct_block_var_receiver?(node, block_var, is_array_collection)
         return false if skip_array_method?(node, block_var, is_array_collection)
         return false if receiver_is_query_chain?(node.children[0])
 
         receiver_chain_starts_with?(node.children[0], block_var)
+      end
+
+      # A relation query method called straight on the iteration element
+      # (`s_eod.ids`, `s_eod.pluck`) — with no association in between — is not an
+      # N+1: on a single record those names resolve to a column or a SELECT alias
+      # (e.g. `array_agg(...) AS ids`), not a relation query. The real N+1 shape
+      # is `element.association.query`, where the receiver is a send, not the bare
+      # block var. (When the element is itself a known array, the safe-method path
+      # handles it instead.)
+      def direct_block_var_receiver?(node, block_var, is_array_collection)
+        !is_array_collection && direct_block_var?(node.children[0], block_var)
+      end
+
+      # `relation.sum(&:amount)` / `relation.max(&:x)` run in Ruby over the loaded
+      # records (Enumerable), not as SQL — passing a block argument is the tell.
+      def enumerable_form?(node)
+        node.children[2..].any? { |arg| arg.is_a?(Parser::AST::Node) && arg.type == :block_pass }
       end
 
       def skip_array_method?(node, block_var, is_array_collection)
@@ -343,14 +383,25 @@ module EagerEye
         model_name && @associations_by_model&.dig(model_name)&.include?(method)
       end
 
+      # With a known receiver model, only flag a method defined as a query on
+      # THAT model. Without an inferred model the global "some model defines this
+      # query-method" fallback would fire on a same-named DB column (e.g. an
+      # EodItem's `comsn_rate` float that Wallet also exposes as a query method),
+      # so a name the schema knows as a column is never treated as a query.
       def method_defined_as_query?(method, model_name)
         return false unless @method_queries
 
         if model_name
           @method_queries[model_name]&.include?(method) || false
+        elsif known_column?(method)
+          false
         else
           @method_queries.any? { |_model, methods| methods.include?(method) }
         end
+      end
+
+      def known_column?(method)
+        @all_columns&.include?(method) || false
       end
 
       def add_issue(node)
