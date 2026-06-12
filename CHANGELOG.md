@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.3.0] - 2026-05-20
+## [1.3.1] - 2026-06-12
+
+### Changed — precision (fewer false positives)
+
+Validated against two large production apps (~1,080 hand-checked findings). These
+changes cut false positives by ~53% (339 → 158) with near-zero recall loss
+(5 findings), and lift the trustworthy detectors toward 100% precision.
+
+- **Schema-aware column guard.** New `SchemaParser` reads `db/schema.rb` (found by
+  walking up from the scanned path) to learn every table's real columns. When a
+  receiver's model can't be inferred, a method whose name the schema knows as a
+  column (`comsn_rate`, `vat_rate`, `service_fee_rate`) is no longer mistaken for
+  an association/query method. `loop_association` and `custom_method_query` no
+  longer flag column reads on unresolved receivers.
+- **Per-iteration association dedup.** `loop_association` reports a memoized
+  `belongs_to`/`has_one` read once per iteration instead of on every line — a
+  repeated read hits Rails' instance cache, not the database. Associations used
+  as a query-chain base (`x.assoc.find_by`, `x.assoc.where`) still report each
+  occurrence, since those re-query.
+- **Serializer render-site awareness.** New `SerializerUsageParser` scans render
+  sites (`XxxBlueprint.render*`, AMS `(each_)serializer:`) and records, per
+  serializer + Blueprinter view, which associations are eager-loaded and whether
+  only single records are passed. `serializer_nesting` stays silent when an
+  association is preloaded at every render site of that view, or the serializer
+  is only ever handed single records. It never concludes "safe" for a view it
+  can't see rendered, so genuine N+1s are preserved.
+- **`custom_method_query` refinements.** Skips Enumerable aggregates with a block
+  argument (`relation.sum(&:amount)`), per-batch queries inside
+  `in_batches`/`find_in_batches`, and relation query methods called directly on a
+  single iteration element (a SELECT alias such as `record.ids`, not a query).
+- **`validation_n_plus_one`** ignores saves that skip validations
+  (`save(validate: false)` / `create(..., validate: false)`).
 
 ### Added
 
