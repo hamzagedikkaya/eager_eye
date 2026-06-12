@@ -19,18 +19,20 @@ module EagerEye
     }.freeze
 
     DETECTOR_EXTRA_ARGS = {
-      Detectors::LoopAssociation => %i[association_preloads association_names method_queries associations_by_model],
-      Detectors::SerializerNesting => %i[association_names method_queries],
+      Detectors::LoopAssociation => %i[association_preloads association_names method_queries associations_by_model
+                                       all_columns],
+      Detectors::SerializerNesting => %i[association_names method_queries serializer_usage all_columns],
       Detectors::MissingCounterCache => %i[association_names],
       Detectors::DecoratorNPlusOne => %i[association_names method_queries],
-      Detectors::CustomMethodQuery => %i[method_queries associations_by_model],
+      Detectors::CustomMethodQuery => %i[method_queries associations_by_model all_columns],
       Detectors::DelegationNPlusOne => %i[delegation_maps],
       Detectors::ScopeChainNPlusOne => %i[scope_maps],
       Detectors::ValidationNPlusOne => %i[uniqueness_models]
     }.freeze
 
     attr_reader :paths, :issues, :association_preloads, :association_names, :method_queries, :delegation_maps,
-                :scope_maps, :uniqueness_models, :associations_by_model
+                :scope_maps, :uniqueness_models, :associations_by_model, :all_columns, :columns_by_model,
+                :serializer_usage
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
@@ -42,16 +44,41 @@ module EagerEye
       @delegation_maps = {}
       @scope_maps = {}
       @uniqueness_models = Set.new
+      @all_columns = Set.new
+      @columns_by_model = {}
+      @serializer_usage = SerializerUsageParser.new
     end
 
     def run
       @issues = []
+      collect_schema
       collect_model_metadata
+      collect_serializer_usage
       ruby_files.each { |file_path| analyze_file(file_path) }
       @issues
     end
 
     private
+
+    def collect_schema
+      schema = SchemaParser.new
+      return unless schema.parse_from_path(@paths[0])
+
+      @all_columns = schema.all_columns
+      @columns_by_model = schema.columns_by_model
+    end
+
+    # Pre-pass over every analyzed file to learn how serializers are rendered
+    # (eager-loaded associations, single-record vs collection). The detector uses
+    # this to stay silent on associations preloaded at all render sites.
+    def collect_serializer_usage
+      ruby_files.each do |file_path|
+        ast = parse_source(File.read(file_path))
+        @serializer_usage.parse_file(ast) if ast
+      rescue Errno::ENOENT, Errno::EACCES
+        next
+      end
+    end
 
     def collect_model_metadata
       model_files.each do |file_path|
