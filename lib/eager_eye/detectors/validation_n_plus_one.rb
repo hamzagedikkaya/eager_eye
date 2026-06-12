@@ -72,6 +72,7 @@ module EagerEye
 
       def check_create_call(node)
         return unless CREATE_METHODS.include?(node.children[1])
+        return if validations_skipped?(node)
 
         receiver = node.children[0]
         return unless receiver&.type == :const
@@ -82,12 +83,36 @@ module EagerEye
 
       def check_save_call(node, new_model_vars)
         return unless SAVE_METHODS.include?(node.children[1])
+        return if validations_skipped?(node)
 
         receiver = node.children[0]
         return unless receiver&.type == :lvar
 
         model_name = new_model_vars[receiver.children[0]]
         add_issue(node, model_name, node.children[1]) if model_name
+      end
+
+      # `save(validate: false)` / `create(..., validate: false)` skip ALL
+      # validations, so the uniqueness SELECT never runs — not an N+1.
+      def validations_skipped?(node)
+        node.children[2..].any? { |arg| hash_with_validate_false?(arg) }
+      end
+
+      def hash_with_validate_false?(arg)
+        return false unless arg.is_a?(Parser::AST::Node) && arg.type == :hash
+
+        arg.children.any? { |pair| validate_false_pair?(pair) }
+      end
+
+      def validate_false_pair?(pair)
+        return false unless pair.type == :pair
+
+        key, value = pair.children
+        key&.type == :sym && key.children[0] == :validate && false_literal?(value)
+      end
+
+      def false_literal?(node)
+        node.is_a?(Parser::AST::Node) && node.type == :false # rubocop:disable Lint/BooleanSymbol
       end
 
       def model_new_call?(node)

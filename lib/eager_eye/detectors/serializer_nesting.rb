@@ -15,11 +15,14 @@ module EagerEye
         :serializer_nesting
       end
 
-      def detect(ast, file_path, association_names = Set.new, method_queries = {})
+      def detect(ast, file_path, association_names = Set.new, method_queries = {}, serializer_usage = nil, # rubocop:disable Metrics/ParameterLists
+                 all_columns = Set.new)
         return [] unless ast
 
         @dynamic_associations = association_names
         @method_queries = method_queries
+        @serializer_usage = serializer_usage
+        @all_columns = all_columns
         issues = []
         traverse_ast(ast) do |node|
           next unless node.type == :class && serializer_class?(node)
@@ -66,11 +69,33 @@ module EagerEye
         body = class_node.children[2]
         return unless body
 
-        traverse_ast(body) do |node|
-          next unless attribute_block?(node) && node.children[2]
-
-          find_association_in_block(node.children[2], file_path, issues)
+        serializer = extract_class_name(class_node)
+        walk_with_view(body, nil) do |attr_block, view|
+          find_association_in_block(attr_block.children[2], file_path, issues, serializer, view)
         end
+      end
+
+      # Walk the class body, tracking the enclosing Blueprinter `view :name do ...
+      # end` so each attribute block is tagged with the view it belongs to (nil =
+      # a base/default field rendered by every view). Yields attribute blocks.
+      def walk_with_view(node, view, &block) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
+        return unless node.is_a?(Parser::AST::Node)
+
+        if view_block?(node)
+          inner_view = node.children[0].children[2]&.children&.first
+          node.children[2..].each { |c| walk_with_view(c, inner_view, &block) }
+          return
+        end
+
+        yield(node, view) if attribute_block?(node) && node.children[2]
+
+        node.children.each { |c| walk_with_view(c, view, &block) }
+      end
+
+      def view_block?(node)
+        node.type == :block && node.children[0]&.type == :send &&
+          node.children[0].children[1] == :view &&
+          node.children[0].children[2]&.type == :sym
       end
 
       def attribute_block?(node)
@@ -78,7 +103,7 @@ module EagerEye
           ATTRIBUTE_METHODS.include?(node.children[0].children[1])
       end
 
-      def find_association_in_block(block_body, file_path, issues)
+      def find_association_in_block(block_body, file_path, issues, serializer, view)
         storage_lines = collect_active_storage_lines(block_body)
 
         traverse_ast(block_body) do |node|
@@ -88,6 +113,7 @@ module EagerEye
           receiver = node.children[0]
           method_name = node.children[1]
           next unless object_reference?(receiver)
+          next if suppressed?(serializer, view, method_name)
 
           if likely_association?(method_name)
             issues << create_issue(
@@ -105,6 +131,22 @@ module EagerEye
             )
           end
         end
+      end
+
+      # Stay silent when the access is provably safe:
+      #   * the name is a plain DB column (not a declared association anywhere), or
+      #   * the render-site index shows that everywhere this serializer/view is
+      #     rendered the association is eager-loaded or only single records are
+      #     passed (so there is no collection to multiply into an N+1).
+      def suppressed?(serializer, view, method_name)
+        return true if column_not_association?(method_name)
+        return false unless @serializer_usage&.known_serializer?(serializer)
+
+        @serializer_usage.safe_access?(serializer, view, method_name)
+      end
+
+      def column_not_association?(method_name)
+        @all_columns&.include?(method_name) && !@dynamic_associations&.include?(method_name)
       end
 
       def object_reference?(node)
