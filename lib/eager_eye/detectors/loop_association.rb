@@ -40,7 +40,7 @@ module EagerEye
       end
 
       def detect(ast, file_path, association_preloads = {}, association_names = Set.new, # rubocop:disable Metrics/ParameterLists
-                 method_queries = {}, associations_by_model = {})
+                 method_queries = {}, associations_by_model = {}, all_columns = Set.new)
         return [] unless ast
 
         @issues = []
@@ -49,6 +49,7 @@ module EagerEye
         @dynamic_associations = association_names
         @method_queries = method_queries
         @associations_by_model = associations_by_model
+        @all_columns = all_columns
 
         # Variable preloads/models leak across methods if tracked globally
         # (e.g. controller#index sets `invoices = Invoice.includes(...)`, then
@@ -472,6 +473,7 @@ module EagerEye
 
       def find_association_calls(node, block_var, file_path, issues, included_associations, model_name, skip_nodes) # rubocop:disable Metrics/ParameterLists
         reported = Set.new
+        @requeried_methods = collect_requeried_methods(node, block_var)
         traverse_ast(node) do |child|
           next if skip_nodes.include?(child.object_id)
 
@@ -495,7 +497,7 @@ module EagerEye
         end
       end
 
-      def reportable_association_call?(node, block_var, reported, included, model_name)
+      def reportable_association_call?(node, block_var, reported, included, model_name) # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
         return false unless node.type == :send
 
         receiver = node.children[0]
@@ -503,7 +505,40 @@ module EagerEye
         return false unless receiver&.type == :lvar && receiver.children[0] == block_var
         return false if excluded_method?(method, included, model_name)
 
-        reported.add?("#{node.loc.line}:#{method}")
+        # A plain association read memoizes on the instance, so reading it more
+        # than once in one iteration only queries on the FIRST access — dedup the
+        # repeats. But an association used as a query-chain base
+        # (`x.assoc.find_by`, `x.assoc.where`) re-queries every time, so those
+        # occurrences are each real and are reported per line.
+        if @requeried_methods&.include?(method)
+          reported.add?("#{node.loc.line}:#{method}")
+        else
+          reported.add?(method.to_s)
+        end
+      end
+
+      # Methods M where `block_var.M` is the receiver of a SQL-issuing query
+      # method (`.find_by`, `.where`, `.exists?`, `.count`, …) somewhere in the
+      # block. Those re-query on every call (they bypass the memoized association
+      # cache), so M's accesses must not be deduped. A plain chained association
+      # read (`x.prize.badges`) is not a re-query — `prize` stays memoized.
+      # rubocop:disable Lint/UselessConstantScoping
+      REQUERYING_METHODS = %i[where find_by find_by! exists? find first last take
+                              pluck ids count sum average minimum maximum any? none? many? one?].freeze
+      # rubocop:enable Lint/UselessConstantScoping
+
+      def collect_requeried_methods(block_body, block_var) # rubocop:disable Metrics/CyclomaticComplexity
+        requeried = Set.new
+        traverse_ast(block_body) do |node|
+          next unless node.type == :send && REQUERYING_METHODS.include?(node.children[1])
+
+          inner = node.children[0]
+          next unless inner.is_a?(Parser::AST::Node) && inner.type == :send
+          next unless inner.children[0]&.type == :lvar && inner.children[0].children[0] == block_var
+
+          requeried << inner.children[1]
+        end
+        requeried
       end
 
       def excluded_method?(method, included, model_name)
@@ -514,14 +549,31 @@ module EagerEye
 
       # When we know the iteration variable's model AND have parsed that model's
       # associations, trust that map exclusively — methods not in it are columns
-      # or scalar accessors, not associations. Otherwise fall back to heuristics
-      # (hardcoded common names + globally collected association names).
+      # or scalar accessors, not associations.
+      #
+      # When the model CANNOT be inferred (workers, lib/, service objects, blocks
+      # over params / method return values), fall back to the association-name
+      # heuristic — but never flag a name that the schema says is a real DB
+      # column. A column named like an association (`comsn_rate`, `vat_rate`) is
+      # the single largest false-positive source; the schema lets us exclude it
+      # while still catching genuine association access (`prize_point`, `user`).
       def known_association?(method, model_name)
         if model_name && @associations_by_model&.key?(model_name)
           return @associations_by_model[model_name].include?(method)
         end
 
-        ASSOCIATION_NAMES.include?(method.to_s) || @dynamic_associations.include?(method)
+        # Receiver model unknown: a name the schema knows as a DB column is not
+        # an association access. Some names are BOTH a column and an association
+        # elsewhere (`vat_rate`, `currency`); without the model we can't tell, so
+        # we err toward silence (no false positive) and skip them. Names that are
+        # only ever associations (`prize_point`, `user`) are still flagged.
+        return false if known_column?(method)
+
+        @dynamic_associations.include?(method) || ASSOCIATION_NAMES.include?(method.to_s)
+      end
+
+      def known_column?(method)
+        @all_columns&.include?(method) || false
       end
 
       def reportable_method_query_call?(node, block_var, reported, model_name)
@@ -529,17 +581,21 @@ module EagerEye
         return false if EXCLUDED_METHODS.include?(node.children[1])
         return false unless method_known_to_query?(node.children[1], model_name)
 
-        reported.add?("#{node.loc.line}:#{node.children[1]}")
+        reported.add?("q:#{node.children[1]}")
       end
 
       # When the receiver model is known, only consider methods defined as a
-      # query on THAT model — not any model in the project. Without a known
-      # model, fall back to the global "any model has this method" heuristic.
+      # query on THAT model. Without a known model the global "any model has this
+      # method" heuristic can fire on a same-named DB column (e.g. a `comsn_rate`
+      # float that some other model also exposes as a query method), so a name
+      # the schema knows as a column is never treated as a query method.
       def method_known_to_query?(method, model_name)
         return false unless @method_queries
 
         if model_name
           @method_queries[model_name]&.include?(method) || false
+        elsif known_column?(method)
+          false
         else
           @method_queries.any? { |_, ms| ms.include?(method) }
         end
