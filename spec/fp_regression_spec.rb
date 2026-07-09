@@ -5,7 +5,7 @@
 # apps and must stay silent, paired with a genuine N+1 that must still fire.
 RSpec.describe "false-positive regressions" do
   def parse(source)
-    Parser::CurrentRuby.parse(source)
+    EagerEye::SourceParser.parse(source)
   end
 
   describe EagerEye::Detectors::LoopAssociation do

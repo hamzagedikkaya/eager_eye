@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "parser/current"
+require_relative "source_parser"
 
 module EagerEye
   # Parses db/schema.rb to learn the real column names of each table. Columns are
@@ -31,7 +31,7 @@ module EagerEye
       schema = locate_schema(start_path)
       return false unless schema
 
-      ast = parse(File.read(schema))
+      ast = parse(File.read(schema), schema)
       return false unless ast
 
       walk(ast)
@@ -62,9 +62,12 @@ module EagerEye
       nil
     end
 
-    def parse(source)
-      Parser::CurrentRuby.parse(source)
-    rescue Parser::SyntaxError
+    # An unparseable schema silently disables the column disambiguation that
+    # filters most false positives, so the failure must not be swallowed.
+    def parse(source, file_path)
+      SourceParser.parse(source, file_path)
+    rescue Parser::SyntaxError, Parser::UnknownEncodingInMagicComment, EncodingError => e
+      warn "EagerEye: Could not parse schema #{file_path}: #{e.message} (schema-aware column checks disabled)"
       nil
     end
 

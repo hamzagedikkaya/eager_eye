@@ -12,7 +12,7 @@ RSpec.describe EagerEye::Detectors::ScopeChainNPlusOne do
 
   describe "#detect" do
     def parse(source)
-      Parser::CurrentRuby.parse(source)
+      EagerEye::SourceParser.parse(source)
     end
 
     context "with scope call on association inside iteration" do

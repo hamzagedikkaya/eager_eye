@@ -5,7 +5,7 @@ RSpec.describe EagerEye::MethodQueryParser do
 
   describe "#parse_model" do
     def parse(source)
-      Parser::CurrentRuby.parse(source)
+      EagerEye::SourceParser.parse(source)
     end
 
     it "detects methods containing where queries" do

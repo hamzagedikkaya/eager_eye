@@ -12,7 +12,7 @@ RSpec.describe EagerEye::Detectors::ValidationNPlusOne do
 
   describe "#detect" do
     def parse(source)
-      Parser::CurrentRuby.parse(source)
+      EagerEye::SourceParser.parse(source)
     end
 
     context "with Model.create inside iteration" do

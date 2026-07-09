@@ -6,7 +6,7 @@ RSpec.describe EagerEye::Detectors::Concerns::NonArSourceDetector do
       include EagerEye::Detectors::Concerns::NonArSourceDetector
 
       def parse(source)
-        Parser::CurrentRuby.parse(source)
+        EagerEye::SourceParser.parse(source)
       end
 
       def test_ar_receiver?(code)

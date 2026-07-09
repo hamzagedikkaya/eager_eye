@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "parser/current"
+require_relative "source_parser"
 
 module EagerEye
   class Analyzer
@@ -32,7 +32,7 @@ module EagerEye
 
     attr_reader :paths, :issues, :association_preloads, :association_names, :method_queries, :delegation_maps,
                 :scope_maps, :uniqueness_models, :associations_by_model, :all_columns, :columns_by_model,
-                :serializer_usage
+                :serializer_usage, :skipped_files
 
     def initialize(paths: nil)
       @paths = Array(paths || EagerEye.configuration.app_path)
@@ -47,10 +47,12 @@ module EagerEye
       @all_columns = Set.new
       @columns_by_model = {}
       @serializer_usage = SerializerUsageParser.new
+      @skipped_files = {}
     end
 
     def run
       @issues = []
+      @skipped_files = {}
       collect_schema
       collect_model_metadata
       collect_serializer_usage
@@ -73,7 +75,7 @@ module EagerEye
     # this to stay silent on associations preloaded at all render sites.
     def collect_serializer_usage
       ruby_files.each do |file_path|
-        ast = parse_source(File.read(file_path))
+        ast = parse_source(File.read(file_path), file_path)
         @serializer_usage.parse_file(ast) if ast
       rescue Errno::ENOENT, Errno::EACCES
         next
@@ -82,7 +84,7 @@ module EagerEye
 
     def collect_model_metadata
       model_files.each do |file_path|
-        ast = parse_source(File.read(file_path))
+        ast = parse_source(File.read(file_path), file_path)
         next unless ast
 
         model_name = extract_model_name(file_path)
@@ -143,7 +145,7 @@ module EagerEye
 
     def analyze_file(file_path)
       source = File.read(file_path)
-      ast = parse_source(source)
+      ast = parse_source(source, file_path)
       return unless ast
 
       comment_parser = CommentParser.new(source)
@@ -160,10 +162,22 @@ module EagerEye
       warn "EagerEye: Could not read file #{file_path}: #{e.message}"
     end
 
-    def parse_source(source)
-      Parser::CurrentRuby.parse(source)
-    rescue Parser::SyntaxError
+    # A file the parser cannot handle (syntax error, binary literal whose
+    # escapes are invalid UTF-8, ...) is skipped from analysis entirely. Each
+    # such file is recorded in #skipped_files and warned about exactly once,
+    # even though every file is parsed by multiple passes.
+    def parse_source(source, file_path)
+      SourceParser.parse(source, file_path)
+    rescue Parser::SyntaxError, Parser::UnknownEncodingInMagicComment, EncodingError => e
+      register_unparseable(file_path, e.message)
       nil
+    end
+
+    def register_unparseable(file_path, message)
+      return if @skipped_files.key?(file_path)
+
+      @skipped_files[file_path] = message
+      warn "EagerEye: Skipped unparseable file #{file_path}: #{message}"
     end
 
     def detector_args(detector, ast, file_path)

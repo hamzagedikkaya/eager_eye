@@ -5,7 +5,7 @@ RSpec.describe EagerEye::ValidationParser do
 
   describe "#parse_model" do
     def parse(source)
-      Parser::CurrentRuby.parse(source)
+      EagerEye::SourceParser.parse(source)
     end
 
     it "detects validates with uniqueness option" do

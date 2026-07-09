@@ -11,7 +11,7 @@ RSpec.describe EagerEye::Detectors::CallbackQuery do
 
   describe "#detect" do
     def parse(source)
-      Parser::CurrentRuby.parse(source)
+      EagerEye::SourceParser.parse(source)
     end
 
     context "when single query is inside after_save callback" do

@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-07-09
+
+
+### Fixed
+
+- **Unparseable files are reported once, by name — not as raw parser dumps.**
+  A file the parser gem cannot lex (e.g. a model holding a binary string
+  literal whose escapes are invalid UTF-8) used to trigger the default
+  diagnostic consumer, which dumped a three-line error block to stderr on
+  *every* analysis pass — three times per scan — labelled `(string):63` with
+  no hint of which file was affected, while the file itself was silently
+  dropped from analysis. All parsing now goes through the new
+  `EagerEye::SourceParser` (quiet diagnostics, buffers named after the real
+  file), and the analyzer emits a single clear line per file instead:
+  `EagerEye: Skipped unparseable file app/models/coupon.rb: literal contains
+  escape sequences incompatible with UTF-8`. Skipped files and their reasons
+  are also exposed programmatically via `Analyzer#skipped_files` (reset on
+  every `#run`). Unknown magic encoding comments (`# encoding: utf8` — a
+  `Parser::UnknownEncodingInMagicComment`, which is an ArgumentError rather
+  than a SyntaxError and previously crashed the whole run) are handled the
+  same way, and an unparseable `db/schema.rb` now warns explicitly that
+  schema-aware column checks are disabled instead of degrading precision in
+  silence.
+- **No more `parser/current` version-deviation warning.** EagerEye now
+  requires the grammar matching the running Ruby's *minor* version
+  (`parser/ruby33` on any 3.3.x) instead of `parser/current`, which insists
+  on an exact patch match and warned on every load ("parser/current is
+  loading parser/ruby33, which recognizes 3.3.4-compliant syntax, but you
+  are running 3.3.1"). Grammar only changes between minor versions, so
+  behaviour is identical; Rubies without a bundled grammar file fall back to
+  `parser/current` as before.
+
 ## [1.3.1] - 2026-06-12
 
 ### Changed — precision (fewer false positives)
