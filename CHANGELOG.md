@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-07-09
+
+### Fixed
+
+- **Repackage 1.3.2, which shipped without `lib/eager_eye/source_parser.rb`.**
+  The 1.3.2 gem was built from a tree where the new `source_parser.rb` had not
+  yet been committed, so `git ls-files` (which drives `spec.files`) omitted it
+  and every `require "eager_eye"` raised `LoadError: cannot load such file --
+  eager_eye/source_parser`. 1.3.3 contains the identical 1.3.2 changes with the
+  file included — no source changes beyond the version bump. The gemspec now
+  also fails the build if any `lib/**/*.rb` file is missing from the package,
+  so this cannot recur.
+
 ## [1.3.2] - 2026-07-09
 
 
