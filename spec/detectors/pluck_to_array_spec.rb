@@ -11,7 +11,7 @@ RSpec.describe EagerEye::Detectors::PluckToArray do
 
   describe "#detect" do
     def parse(source)
-      Parser::CurrentRuby.parse(source)
+      EagerEye::SourceParser.parse(source)
     end
 
     context "when pluck result is used in where" do

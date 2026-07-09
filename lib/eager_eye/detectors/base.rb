@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "parser/current"
+require_relative "../source_parser"
 
 module EagerEye
   module Detectors
@@ -43,9 +43,12 @@ module EagerEye
         node.children.each { |child| traverse_ast(child, &block) }
       end
 
-      def parse_source(source)
-        Parser::CurrentRuby.parse(source)
-      rescue Parser::SyntaxError
+      # Convenience for detector subclasses; returns nil (without any stderr
+      # output) when the source cannot be parsed. Pass file_path so any
+      # diagnostics you inspect on the raised error name the real file.
+      def parse_source(source, file_path = "(string)")
+        SourceParser.parse(source, file_path)
+      rescue Parser::SyntaxError, Parser::UnknownEncodingInMagicComment, EncodingError
         nil
       end
 

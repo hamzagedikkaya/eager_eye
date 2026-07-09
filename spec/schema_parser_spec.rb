@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "tmpdir"
+require "fileutils"
+
 RSpec.describe EagerEye::SchemaParser do
   let(:parser) { described_class.new }
   let(:app_path) { File.expand_path("fixtures/schema_app/app", __dir__) }
@@ -27,6 +30,23 @@ RSpec.describe EagerEye::SchemaParser do
       parser.parse_from_path(app_path)
       expect(parser.columns_by_model["EodItem"]).to include(:comsn_rate, :vat_rate)
       expect(parser.columns_by_model["Merchant"]).to include(:service_fee_rate)
+    end
+
+    it "returns false and warns when the schema cannot be parsed" do
+      Dir.mktmpdir do |root|
+        FileUtils.mkdir_p(File.join(root, "db"))
+        FileUtils.mkdir_p(File.join(root, "app"))
+        schema_file = File.join(root, "db", "schema.rb")
+        File.write(schema_file, "ActiveRecord::Schema.define do\n  create_table \"users\" do |t|\n")
+
+        result = nil
+        expect { result = parser.parse_from_path(File.join(root, "app")) }
+          .to output(/\AEagerEye: Could not parse schema #{Regexp.escape(schema_file)}: .+disabled\)\n\z/)
+          .to_stderr
+
+        expect(result).to be(false)
+        expect(parser.all_columns).to be_empty
+      end
     end
   end
 end

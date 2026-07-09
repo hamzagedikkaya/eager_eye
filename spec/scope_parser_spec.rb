@@ -5,7 +5,7 @@ RSpec.describe EagerEye::ScopeParser do
 
   describe "#parse_model" do
     def parse(source)
-      Parser::CurrentRuby.parse(source)
+      EagerEye::SourceParser.parse(source)
     end
 
     it "extracts scope definitions from model" do

@@ -94,18 +94,85 @@ RSpec.describe EagerEye::Analyzer do
     end
 
     context "with invalid Ruby syntax" do
-      it "skips files with syntax errors" do
+      it "skips files with syntax errors, records them and warns with the file path" do
         # Create a temp file with invalid syntax
         invalid_file = File.join(fixtures_path, "invalid_syntax.rb")
         File.write(invalid_file, "def foo(")
 
         begin
           analyzer = described_class.new(paths: invalid_file)
-          issues = analyzer.run
+          issues = nil
+          expect { issues = analyzer.run }
+            .to output(/\AEagerEye: Skipped unparseable file #{Regexp.escape(invalid_file)}: .+\n\z/).to_stderr
 
           expect(issues).to be_empty
+          expect(analyzer.skipped_files.keys).to eq([invalid_file])
         ensure
           FileUtils.rm_f(invalid_file)
+        end
+      end
+
+      it "skips files with unknown magic encoding comments" do
+        invalid_file = File.join(fixtures_path, "bad_encoding_comment.rb")
+        File.write(invalid_file, "# encoding: utf8\nx = 1\n")
+
+        begin
+          analyzer = described_class.new(paths: invalid_file)
+          expect { analyzer.run }
+            .to output(/\AEagerEye: Skipped unparseable file #{Regexp.escape(invalid_file)}: .+\n\z/).to_stderr
+
+          expect(analyzer.skipped_files.keys).to eq([invalid_file])
+        ensure
+          FileUtils.rm_f(invalid_file)
+        end
+      end
+
+      it "resets skipped_files (and the warn-once state) on each run" do
+        invalid_file = File.join(fixtures_path, "invalid_syntax.rb")
+        File.write(invalid_file, "def foo(")
+
+        begin
+          analyzer = described_class.new(paths: invalid_file)
+          expect { analyzer.run }.to output(/Skipped unparseable file/).to_stderr
+
+          File.write(invalid_file, "def foo; end")
+          expect { analyzer.run }.not_to output.to_stderr
+          expect(analyzer.skipped_files).to be_empty
+
+          File.write(invalid_file, "def foo(")
+          expect { analyzer.run }.to output(/Skipped unparseable file/).to_stderr
+          expect(analyzer.skipped_files.keys).to eq([invalid_file])
+        ensure
+          FileUtils.rm_f(invalid_file)
+        end
+      end
+
+      it "warns only once per file even though model files are parsed by several passes" do
+        # A binary string literal the parser gem refuses to lex — the coupon.rb case.
+        models_dir = File.join(fixtures_path, "models")
+        binary_model = File.join(models_dir, "binary_literal_model.rb")
+
+        begin
+          FileUtils.mkdir_p(models_dir)
+          File.write(binary_model, <<~RUBY)
+            class BinaryLiteralModel
+              KEY = "\\x8E\\xAFH-\\xC9"
+            end
+          RUBY
+
+          analyzer = described_class.new(paths: fixtures_path)
+          issues = nil
+          # Exactly one warn line, despite serializer-usage, model-metadata and
+          # analysis passes all parsing the same model file.
+          expect { issues = analyzer.run }
+            .to output(/\AEagerEye: Skipped unparseable file #{Regexp.escape(binary_model)}: .+\n\z/).to_stderr
+
+          expect(issues).not_to be_empty
+          expect(analyzer.skipped_files.keys).to eq([binary_model])
+          expect(analyzer.skipped_files[binary_model]).to match(/escape sequences incompatible/)
+        ensure
+          FileUtils.rm_f(binary_model)
+          FileUtils.rmdir(models_dir) if Dir.exist?(models_dir) && Dir.empty?(models_dir)
         end
       end
     end

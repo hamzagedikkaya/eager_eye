@@ -2,6 +2,7 @@
 
 require "set"
 require_relative "eager_eye/version"
+require_relative "eager_eye/source_parser"
 require_relative "eager_eye/configuration"
 require_relative "eager_eye/issue"
 require_relative "eager_eye/baseline"

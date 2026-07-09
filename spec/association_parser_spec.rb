@@ -13,7 +13,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations["Post#comments"]).to include(:author)
@@ -26,7 +26,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "User")
 
       expect(parser.preloaded_associations["User#profile"]).to include(:avatar)
@@ -39,7 +39,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Comment")
 
       expect(parser.preloaded_associations["Comment#post"]).to include(:author)
@@ -52,7 +52,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations["Post#comments"]).to include(:author, :likes)
@@ -65,7 +65,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations["Post#comments"]).to include(:author)
@@ -78,7 +78,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations["Post#comments"]).to include(:author)
@@ -91,7 +91,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations).to be_empty
@@ -104,7 +104,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations["Post#comments"]).to include(:author)
@@ -119,7 +119,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations).to be_empty
@@ -132,7 +132,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations["Post#tags"]).to include(:category)
@@ -150,7 +150,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Article")
 
       expect(parser.preloaded_associations.keys).to include("Article#comments")
@@ -163,7 +163,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       expect(parser.preloaded_associations["Post#comments"]).to include(:author)
@@ -178,7 +178,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "User")
 
       expect(parser.preloaded_associations.size).to eq(2)
@@ -197,7 +197,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "User")
 
       expect(parser.association_names).to include(:posts, :profile, :company, :enrollments)
@@ -210,7 +210,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Order")
 
       expect(parser.association_names).to include(:subscriptions)
@@ -224,7 +224,7 @@ RSpec.describe EagerEye::AssociationParser do
         end
       RUBY
 
-      ast = Parser::CurrentRuby.parse(code)
+      ast = EagerEye::SourceParser.parse(code)
       parser.parse_model(ast, "Post")
 
       # Empty includes should not add to preloaded_associations

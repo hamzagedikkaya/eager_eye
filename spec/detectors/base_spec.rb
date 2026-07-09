@@ -141,5 +141,12 @@ RSpec.describe EagerEye::Detectors::Base do
 
       expect(ast).to be_nil
     end
+
+    it "returns nil quietly for sources the parser cannot lex" do
+      ast = :unset
+      expect { ast = test_detector.public_parse_source('KEY = "\x8E\xAF"') }.not_to output.to_stderr
+
+      expect(ast).to be_nil
+    end
   end
 end

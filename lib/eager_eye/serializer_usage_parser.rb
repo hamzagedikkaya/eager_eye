@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "parser/current"
+require_relative "source_parser"
 
 module EagerEye
   # Serializers are the worst false-positive source because the detector sees the

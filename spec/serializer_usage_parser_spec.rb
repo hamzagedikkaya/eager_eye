@@ -4,7 +4,7 @@ RSpec.describe EagerEye::SerializerUsageParser do
   let(:parser) { described_class.new }
 
   def parse_files(*sources)
-    sources.each { |s| parser.parse_file(Parser::CurrentRuby.parse(s)) }
+    sources.each { |s| parser.parse_file(EagerEye::SourceParser.parse(s)) }
     parser
   end
 
