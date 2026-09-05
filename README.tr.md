@@ -64,9 +64,15 @@ eager_eye app/controllers app/serializers
 # Config dosyası oluştur (opsiyonel)
 rails g eager_eye:install
 
-# Rake ile çalıştır
+# Rake ile çalıştır (console veya JSON)
 rake eager_eye:analyze
+rake eager_eye:json
 ```
+
+> **İpucu:** tek bir dosya veya `app/controllers` yerine `models/` dizinini içeren bir yolu
+> (örn. `app/`) tara. Model metadata'sı (ilişkiler, `delegate`, `scope`, uniqueness
+> validation'ları) `<ilk yol>/models/**` altından toplanır; 8, 10 ve 11 numaralı detector'lar
+> ile preload-farkında ilişki takibi buna bağlıdır.
 
 Örnek çıktı:
 
@@ -136,6 +142,11 @@ render json: PostSerializer.render(@posts)
 ```
 
 Blueprinter, ActiveModel::Serializers ve Alba'yı destekler.
+
+Render-site farkında: EagerEye serializer'ın nerede render edildiğini tarar
+(`PostBlueprint.render(...)`, AMS `serializer:` / `each_serializer:`) ve ilişki o view'ın
+her render noktasında preload edilmişse ya da serializer'a yalnızca tek kayıt geçiliyorsa
+sessiz kalır. Hiç render edildiğini görmediği bir view yine raporlanır.
 
 ### 3. MissingCounterCache
 
@@ -397,8 +408,12 @@ Matcher seçenekleri: `only:` (Array<Symbol>), `exclude:` (Array<String> glob'la
 
 ## Yapılandırma
 
+`rails g eager_eye:install` bir `.eager_eye.yml` oluşturur; bu dosyayı `rake eager_eye:*`
+görevleri `Rails.root`'tan yükler. `eager_eye` CLI'ı bu dosyayı okumaz — karşılığı olan
+flag'leri (`--exclude`, `--only`, `--min-severity`, `--no-fail`) kullan.
+
 ```yaml
-# .eager_eye.yml
+# .eager_eye.yml  (rake eager_eye:analyze / eager_eye:json tarafından okunur)
 excluded_paths:
   - app/legacy/**
   - lib/tasks/**
@@ -409,17 +424,12 @@ enabled_detectors:        # varsayılan: hepsi
   - custom_method_query
   # ...
 
-severity_levels:
-  loop_association: error
-  missing_counter_cache: info
-  # ...
-
-min_severity: warning     # info | warning | error
 app_path: app
 fail_on_issues: true
 ```
 
-Veya programatik olarak:
+Severity eşiği ve detector başına severity programatik olarak (veya CLI'da
+`--min-severity` ile) ayarlanır:
 
 ```ruby
 EagerEye.configure do |config|
@@ -457,7 +467,9 @@ EagerEye statik analiz yapar. Bunun trade-off'ları var:
 - **Runtime context yok** — `find_each` block'unun runtime'da gerçekten ne yaptığını göremez.
 - **Heuristic ilişki tespiti** — model parse setinde olmadığında yaygın isim desenlerine (`author`, `user`, ...) düşer; küçük edge case'lerde fazla flag'leyebilir.
 - **Cross-file akış** — preload'ları aynı sınıftaki metodlar arasında takip eder (controller → kendi private helper'ları), ama cross-file akış (controller → harici service object → iterasyon) henüz takip edilmiyor.
-- **Sadece Ruby kodu** — SQL veya DB şemanı okumaz.
+- **Model keşfi yola bağlı** — ilişkiler, `delegate`, `scope` ve uniqueness validation'ları `<taranan ilk yol>/models/**` altından okunur. Tek bir dosya veya `app/controllers` taranırsa bu adım atlanır; `DelegationNPlusOne`, `ScopeChainNPlusOne` ve `ValidationNPlusOne` çalışmaz, ilişki tespiti isim heuristic'lerine düşer. `app/` tara.
+- **Şema, veritabanı değil** — kolon isimlerini öğrenip kolonları ilişkiyle karıştırmamak için `db/schema.rb`'yi okur (taranan yoldan yukarı doğru arar); veritabanına bağlanmaz, SQL parse etmez. `schema.rb` bulunamazsa koruma sessizce devre dışı kalır; dosya var ama parse edilemiyorsa bir uyarı basılır.
+- **Parse edilemeyen dosyalar atlanır** — `parser` gem'inin lex edemediği bir dosya (geçersiz UTF-8 escape, bilinmeyen `# encoding:` yorumu, syntax hatası) tek bir `EagerEye: Skipped unparseable file ...` uyarısıyla analizden düşer. Liste programatik olarak `Analyzer#skipped_files` ile alınabilir.
 
 Tam kapsama için [Bullet](https://github.com/flyerhzm/bullet) ile birlikte kullan: statik (EagerEye) test'lerin girmediği yolları, runtime (Bullet) statik analizin göremediklerini yakalar.
 

@@ -64,9 +64,15 @@ eager_eye app/controllers app/serializers
 # Generate a config file (optional)
 rails g eager_eye:install
 
-# Run via rake
+# Run via rake (console or JSON)
 rake eager_eye:analyze
+rake eager_eye:json
 ```
+
+> **Tip:** scan a path that contains your `models/` directory (e.g. `app/`) rather than
+> a single file or `app/controllers`. Model metadata (associations, `delegate`, `scope`,
+> uniqueness validations) is collected from `<first path>/models/**`, and detectors 8, 10
+> and 11 plus preload-aware association tracking depend on it.
 
 Sample output:
 
@@ -136,6 +142,11 @@ render json: PostSerializer.render(@posts)
 ```
 
 Supports Blueprinter, ActiveModel::Serializers, Alba.
+
+Render-site aware: EagerEye scans where a serializer is rendered (`PostBlueprint.render(...)`,
+AMS `serializer:` / `each_serializer:`) and stays silent when the association is preloaded at
+every render site of that view, or the serializer only ever receives single records. A view it
+never sees rendered is still reported.
 
 ### 3. MissingCounterCache
 
@@ -396,8 +407,12 @@ Matcher options: `only:` (Array<Symbol>), `exclude:` (Array<String> globs), `max
 
 ## Configuration
 
+`rails g eager_eye:install` creates `.eager_eye.yml`, which the `rake eager_eye:*` tasks
+load from `Rails.root`. The `eager_eye` CLI does not read it — pass the equivalent flags
+(`--exclude`, `--only`, `--min-severity`, `--no-fail`) instead.
+
 ```yaml
-# .eager_eye.yml
+# .eager_eye.yml  (read by rake eager_eye:analyze / eager_eye:json)
 excluded_paths:
   - app/legacy/**
   - lib/tasks/**
@@ -408,17 +423,12 @@ enabled_detectors:        # default: all
   - custom_method_query
   # ...
 
-severity_levels:
-  loop_association: error
-  missing_counter_cache: info
-  # ...
-
-min_severity: warning     # info | warning | error
 app_path: app
 fail_on_issues: true
 ```
 
-Or programmatically:
+Severity thresholds and per-detector severities are configured programmatically
+(or via `--min-severity` on the CLI):
 
 ```ruby
 EagerEye.configure do |config|
@@ -456,7 +466,9 @@ EagerEye is static analysis. That comes with trade-offs:
 - **No runtime context** — can't see what `find_each` block actually does at runtime.
 - **Heuristic association detection** — falls back to common name patterns (`author`, `user`, ...) when a model isn't in the parsed set; can over-flag in tiny edge cases.
 - **Cross-file flow** — propagates preloads across same-class methods (controller → its private helpers), but cross-file flow (controller → external service object → iteration) isn't tracked yet.
-- **Ruby code only** — doesn't read SQL or your DB schema.
+- **Model discovery is path-based** — associations, `delegate`, `scope` and uniqueness validations are read from `<first scanned path>/models/**`. Scanning a single file or `app/controllers` skips that step, so `DelegationNPlusOne`, `ScopeChainNPlusOne` and `ValidationNPlusOne` won't fire and association detection falls back to name heuristics. Scan `app/`.
+- **Schema, not database** — reads `db/schema.rb` (found by walking up from the scanned path) to learn column names and avoid mistaking columns for associations; it never connects to a database or parses SQL. If no `schema.rb` is found the guard is simply off; if one exists but can't be parsed, a warning says so.
+- **Unparseable files are skipped** — a file the `parser` gem can't lex (invalid UTF-8 escapes, unknown `# encoding:` comment, syntax error) is dropped from analysis with a single `EagerEye: Skipped unparseable file ...` warning. The list is available programmatically via `Analyzer#skipped_files`.
 
 Use it alongside [Bullet](https://github.com/flyerhzm/bullet) for a complete picture: static (EagerEye) catches code paths tests don't hit, runtime (Bullet) catches what static can't see.
 
